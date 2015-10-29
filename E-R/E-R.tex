@@ -1,16 +1,54 @@
 % @Author: Yinlong Su
 % @Date:   2015-10-08 20:18:18
 % @Last Modified by:   Yinlong Su
-% @Last Modified time: 2015-10-08 20:21:27
+% @Last Modified time: 2015-10-28 20:21:11
 
 \documentclass{article}
 \usepackage{graphicx}
+\usepackage{tikz-er2}
+\usetikzlibrary{shadows,positioning}
 
 \begin{document}
 
 \begin{figure}[!htp]
 \centering
-\includegraphics[width=\textwidth]{E-R.eps}
+\tikzset{every entity/.style={top color=white,bottom color=blue!30,draw=blue!50!black!100,drop shadow},
+        every attribute/.style = {top color=white, bottom color=yellow!20,
+                                  draw=yellow, drop shadow},
+        every relationship/.style ={top color=white, bottom color=red!20,
+                                  draw=red!50!black!100, drop shadow},
+        every edge/.style = {link},
+        every isa/.style = {top color=white, bottom color=green!20,
+                                  draw=green!50!black!100, drop shadow},
+        }
+
+
+\begin{tikzpicture}[scale=0.8]
+
+\node[entity] [draw] at (0, 0) (owner) {Owner};
+\node[attribute] (id) [left = of owner] {\key{Id}} edge (owner);
+\node[attribute] (name) [above left = of owner] {Name} edge (owner);
+\node[attribute] (address) [above = of owner] {Address} edge (owner);
+
+\node[isa] (isa1) [draw] at (0, -2) {IsA} edge node [auto] {disjoint} (owner);
+
+\node[relationship] (signs) [draw] at (0, -5) {Signs};
+
+\node[entity] (person) [right = of signs] {Person} edge (isa1) edge (signs);
+\node[attribute] (dob) [below = of person] {DOB} edge (person);
+
+\node[entity] (organization) [left = of signs] {Organization} edge (isa1) edge (signs);
+
+\node[relationship] (owns) [draw] at (4, 0) {Owns} edge (owner);
+
+\node[entity] (account) [draw] at (8, 0) {Account} edge [->, very thick] (owns);
+\node[attribute] (number) [above = of account] {\key{Number}} edge (account);
+\node[attribute] (balance) [above right = of account] {Balance} edge (account);
+\node[attribute] (limit) [right = of account] {Limit} edge (account);
+
+\node [relationship] (authorizes) [draw] at (8, -5) {Authorizes} edge (account) edge(person);
+
+\end{tikzpicture}
 \caption{E-R diagram for CCDB}
 \end{figure}
 

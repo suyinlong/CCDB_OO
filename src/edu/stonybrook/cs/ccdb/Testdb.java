@@ -8,9 +8,6 @@ public class Testdb {
 		Statement stmt;
 		ResultSet rs;
 		
-		String usr = "yinlongsu";
-		String pwd = "CSE532A2";
-		String url = "jdbc:postgresql://127.0.0.1:5432/ccdb";
 		String sql = "select * from test";
 		
 		try {
@@ -22,7 +19,7 @@ public class Testdb {
 		}
 		
 		try {
-			conn = DriverManager.getConnection(url, usr, pwd);
+			conn = DriverManager.getConnection(Configuration.URL, Configuration.USR, Configuration.PWD);
 			System.out.println("Success connecting server!");
 			stmt = conn.createStatement(ResultSet.TYPE_SCROLL_SENSITIVE, ResultSet.CONCUR_UPDATABLE);
 			rs = stmt.executeQuery(sql);
