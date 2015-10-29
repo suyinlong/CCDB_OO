@@ -1,7 +1,7 @@
 % @Author: Yinlong Su
 % @Date:   2015-10-08 20:18:18
 % @Last Modified by:   Yinlong Su
-% @Last Modified time: 2015-10-28 20:21:11
+% @Last Modified time: 2015-10-29 18:44:51
 
 \documentclass{article}
 \usepackage{graphicx}
@@ -25,28 +25,33 @@
 
 \begin{tikzpicture}[scale=0.8]
 
-\node[entity] [draw] at (0, 0) (owner) {Owner};
-\node[attribute] (id) [left = of owner] {\key{Id}} edge (owner);
-\node[attribute] (name) [above left = of owner] {Name} edge (owner);
-\node[attribute] (address) [above = of owner] {Address} edge (owner);
-
-\node[isa] (isa1) [draw] at (0, -2) {IsA} edge node [auto] {disjoint} (owner);
-
-\node[relationship] (signs) [draw] at (0, -5) {Signs};
-
-\node[entity] (person) [right = of signs] {Person} edge (isa1) edge (signs);
-\node[attribute] (dob) [below = of person] {DOB} edge (person);
-
-\node[entity] (organization) [left = of signs] {Organization} edge (isa1) edge (signs);
-
-\node[relationship] (owns) [draw] at (4, 0) {Owns} edge (owner);
-
-\node[entity] (account) [draw] at (8, 0) {Account} edge [->, very thick] (owns);
+\node[entity] [draw] at (0, 0) (account) {Account};
 \node[attribute] (number) [above = of account] {\key{Number}} edge (account);
 \node[attribute] (balance) [above right = of account] {Balance} edge (account);
-\node[attribute] (limit) [right = of account] {Limit} edge (account);
+\node[attribute] (limit) [left = of account] {Limit} edge (account);
 
-\node [relationship] (authorizes) [draw] at (8, -5) {Authorizes} edge (account) edge(person);
+\node[isa] (isa1) [draw] at (0, -2) {IsA} edge (account);
+
+\node[entity] (orgaccount) [draw] at (-2, -4) {OrgAccount} edge node [left] {disjoint} (isa1);
+\node[entity] (peraccount) [draw] at (2, -4) {PerAccount} edge node [right] {covering} (isa1);
+
+\node[relationship] (owns1) [draw] at (-2, -7) {Owns} edge [<-, very thick] (orgaccount);
+\node[relationship] (owns2) [draw] at (2, -7) {Owns} edge [<-, very thick] (peraccount);
+
+\node[entity] (organization) [draw] at (-2, -10) {Organization} edge (owns1);
+\node[attribute] (id) [left = of organization] {\key{Id}} edge (organization);
+\node[attribute] (name) [below left = of organization] {Name} edge (organization);
+\node[attribute] (address) [below = of organization] {Address} edge (organization);
+
+\node[entity] (person) [draw] at (4, -10) {Person} edge (owns2);
+\node[attribute] (id) [above right = of person] {\key{Id}} edge (person);
+\node[attribute] (name) [right = of person] {Name} edge (person);
+\node[attribute] (address) [below right = of person] {Address} edge (person);
+\node[attribute] (dob) [below = of person] {DOB} edge (person);
+
+\node[relationship] (signs) [draw] at (1, -10) {Signs} edge (organization) edge (person);
+
+\node [relationship] (authorizes) [draw] at (4, 0) {Authorizes} edge (account) edge(person);
 
 \end{tikzpicture}
 \caption{E-R diagram for CCDB}
