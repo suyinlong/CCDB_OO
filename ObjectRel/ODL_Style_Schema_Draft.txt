@@ -1,0 +1,38 @@
+interface ACCOUNT: Object
+    ( key: Number )
+{
+    attribute Integer Number;
+    attribute Integer Balance;
+    attribute Integer Limit;
+    relationship PERSON AuthorizerdUser;
+}
+
+class PERSONACCOUNT: ACCOUNT
+{
+    relationship PERSON Owner;
+}
+
+class ORGANIZATIONACCOUNT: ACCOUNT
+{
+    relationship ORGANIZTION Owner;
+}
+
+class ORGANIZATION
+    ( key: Id )
+{
+    attribute Integer Id;
+    attribute String Name;
+    attribute String Address;
+    relationship Person Signers
+                  inverse PERSON::Id;
+}
+
+class PERSON
+    ( key: Id )
+{
+    attribute Integer Id;
+    attribute String Name;
+    attribute String Address;
+    attribute String DOB
+               inverse ORGNIZATION::Id;
+}
