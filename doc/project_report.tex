@@ -1,7 +1,7 @@
 % @Author: Yinlong Su
 % @Date:   2015-10-30 16:15:47
 % @Last Modified by:   Yinlong Su
-% @Last Modified time: 2015-10-30 18:43:27
+% @Last Modified time: 2015-10-30 20:27:25
 
 \documentclass[11pt]{article}
 \usepackage{pgf-umlcd}
@@ -73,7 +73,7 @@ After a series of consideration, we decided the final Entity-Relationship Model 
 \subsubsection{Account Type Hierarchy}
 
 \par
-The first problem we encountered is that the owner of a credit card account can be either a person or an organization. Although the sample test data has different ids between Person and Organization, we can not assume all data satifsies this condition. If we add a new enum column, labeling the owner type, into Account, then we can distingish it. But then we have another problem: we can not define a proper foreign key constraint under owner column. And we don't want to create a trigger in order to ensure data consistency.
+The first problem we encountered is that the owner of a credit card account can be either a person or an organization. Although the sample test data has different ids between Person and Organization, we can not assume all data satifsies this condition. If we add a new enum column, which labeling the owner type, into Account, then we can distingish it. But then we have another problem: we can not define a proper foreign key constraint under owner column. And we don't want to create a trigger in order to ensure data consistency.
 
 \begin{wrapfigure}{R}{0.5\textwidth}
 \begin{tikzpicture}[scale=0.8]
@@ -114,7 +114,7 @@ In our CCDB, a person can partcipate in many relationship. For example, a person
 We used the concept of inheritance from object-oriented databases in PostgreSQL. Two tables, Signer and AuthorizedUser, inherit from Person. If we insert data into supertable Person, the subtables will have no data. That's understandable since the subtable has more attributes and constraints so that it can not extract data directly from supertable. But one person can be both a signer and an authorized user. If we insert data into subtables, we will have duplicate tuples in the view of supertable. For example `p4 - May' is a signer of organization `Acme', and also an authorized user of credit card c10. We insert the data of May into Signer and AuthorizedUser then we have two ``identical'' tuples in supertable Person.
 
 \par
-We quote ``identical'' because they are actually different tuples in PostgreSQL database. In PostgreSQL documents, the behavior is described as \emph{"INSERT always inserts into exactly the table specified."} Therefore, we have two different tuples with same values in table Signer and AuthorizedUser. When we run SELECT query on Person, PostgreSQL returns all data from tables inherited from Person.
+We quote ``identical'' because they are actually different tuples in PostgreSQL database. In PostgreSQL documents, the behavior is described as \emph{``INSERT always inserts into exactly the table specified."} Therefore, we have two different tuples with same values in table Signer and AuthorizedUser. When we run SELECT query on Person, PostgreSQL returns all data from tables inherited from Person.
 
 \par
 To show that, we modified the table to explicitly store OIDs. Then we ran the following SQL command and got the result as shown in Figure.4.
@@ -140,6 +140,67 @@ In fact, that is not the only problem that inheritance of PostgreSQL rises. When
 \emph{All check constraints and not-null constraints on a parent table are automatically inherited by its children. Other types of constraints (unique, primary key, and foreign key constraints) are not inherited.}
 \par
 As a result, we need to handle the foreign key constraints which point to a supertable very carefully. The best way is to avoid using that. But we can also create some triggers to ensure the data consistency. Based on the complexity of implementation and the performance on PostgreSQL, we decided not to partition the Person type.
+
+\subsubsection{Relationships}
+\par
+After splitting the Account entity type into PerAccount and OrgAccount, we also split the relationship ``Owns''. But we don't need extra table to store this relationship. In fact, every account can have just one owner, no more and no less. We draw an arrow pointing in the direction of the relationship's diamond in very thick lines. We know that Id is a key of PerAccount and also of PersonOwns. Thus, we can merge the attributes of PersonOwns into PerAccount. It is guaranteed that each PerAccount tuple has exactly one corresponding PersonOwns tuple, so no redundancy is created. Then we can concatenate PerAccount and PersonOwns tuples which have same account id, and the same to OrgAccount and OrganizationOwns.
+\par
+We need to create table for Signs relationship. The relationship is a many-to-many one. The attributes in Signs are id in Person and id in Organaztion, and both of them are primary key and foreign key pointing to corresponding table.
+\par
+We also create Authorizes table for the relation Authorizes. The tricky part is the foreign key is pointing to a supertable, which rises trouble in PostgreSQL. In PostgreSQL, we create triggers to ensure the consistency. One trigger executes before insert or update on Authorizes. The other one executes after update or delete on Account. We will talk about triggers later in Object-oriented design of CCDB in section ?.?.?.
+
+\subsubsection{Relational Database Schemas}
+\par
+Now we can convert the E-R diagram to relational database schemas. Noting that here we assume there is no inheritance and other object-oriented features. We keep Person and Organization entities. For account type hierarchy, we represent the IsA relationship in general representation. That means we create Account table stroing all information except owner. And table PerAccount and OrgAccount both have a foreign key pointing to Account and another foreign key pointing to the corresponding owner. The relationship Owns has been merged into PerAccount and OrgAccount. The SQL CREATE statements are as follows.
+\begin{verbatim}
+   CREATE TABLE Person (
+     Id      CHAR(20),
+     Name    CHAR(20),
+     Address CHAR(50),
+     Dob     DATE,
+     PRIMARY KEY (Id) )
+
+   CREATE TABLE Organization (
+     Id      CHAR(20),
+     Name    CHAR(20),
+     Address CHAR(50)
+     PRIMARY KEY (Id) )
+
+   CREATE TABLE Account (
+     Number  CHAR(20),
+     Balance DECIMAL,
+     Limit   DECIMAL,
+     PRIMARY KEY (Number) )
+   )
+
+   CREATE TABLE PerAccount (
+     Number  CHAR(20),
+     Owner   CHAR(20) NOT NULL,
+     PRIMARY KEY (Number),
+     FOREIGN KEY (Number) REFERENCES Account(Number),
+     FOREIGN KEY (Owner) REFERENCES Person(Id) )
+
+   CREATE TABLE OrgAccount (
+     Number  CHAR(20),
+     Owner   CHAR(20) NOT NULL,
+     PRIMARY KEY (Number),
+     FOREIGN KEY (Number) REFERENCES Account(Number),
+     FOREIGN KEY (Owner) REFERENCES Organization(Id) )
+
+    CREATE TABLE Signs (
+      Pid CHAR(20),
+      Oid CHAR(20),
+      PRIMARY KEY (Pid, Oid),
+      FOREIGN KEY (Pid) REFERENCES Person(Id),
+      FOREIGN KEY (Oid) REFERENCES Organization(Id) )
+
+     CREATE TABLE Authorizes (
+       Number CHAR(20),
+       Pid    CHAR(20),
+       PRIMARY KEY (Number, Pid),
+       FOREIGN KEY (Number) REFERENCES Account(Number),
+       FOREIGN KEY (Pid) REFERENCES Person(Id) )
+\end{verbatim}
 
 \subsection{UML Design}
 
