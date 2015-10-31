@@ -1,7 +1,7 @@
 % @Author: Yinlong Su
 % @Date:   2015-10-30 16:15:47
 % @Last Modified by:   Yinlong Su
-% @Last Modified time: 2015-10-30 23:43:20
+% @Last Modified time: 2015-10-31 19:17:42
 
 \documentclass[11pt]{article}
 \usepackage{pgf-umlcd}
@@ -199,13 +199,13 @@ class Person
 
         \begin{class}[text width=5cm]{OrgAccount}{-5,-6}
             \attribute{owner : Organization}
-            \inherit{Account}
+            \implement{Account}
             \operation{getOwner() : Organzation}
         \end{class}
 
         \begin{class}[text width=5cm]{PerAccount}{5,-6}
             \attribute{owner : Person}
-            \inherit{Account}
+            \implement{Account}
             \operation{getOwner() : Person}
         \end{class}
     \end{package}
@@ -354,33 +354,309 @@ In fact, that is not the only problem that inheritance of PostgreSQL rises. When
 As a result, we need to handle the foreign key constraints which point to a supertable very carefully. The best way is to avoid using that. But we can also create some triggers to ensure the data consistency. Based on the complexity of implementation and the performance on PostgreSQL, we decided not to partition the Person type.
 
 \subsubsection{References in PostgreSQL}
+\label{sec:refinpgsql}
 \par
-\#What is in SQL, what is difference in PostgreSQL
+In SQL 1999/2003 object extensions, we can use object references to access related objects in a way similar to object-oriented language, like Java. In PostgreSQL, we can define a column type as an existing table. For example, we can define ``owner'' column as Person type in table PerAccount. But it is actually store a Person tuple in the column, not a real reference. PostgreSQL does not provide reference types. Instead, PostgreSQL has a kind of object identifier types. For safety issues, PostgreSQL only uses OIDs as primary keys for various system tables. User-created tables are not recommended to use OIDs.
 \par
-\#Oid, foreign key
+Using OIDs in our tables does not simplify the query in our system. No function or call is provided to convert OID to object. If we want to get the object the OID represents, we have to do join query. Basically, it has nothing different from using our own foreign keys.
 \par
-\#Does not support ARRAY ELEMENT foreign key referencing
+In addition, PostgreSQL does not support array element foreign key referencing. In our original object-relational design, we have some array attributes in our classes. PostgreSQL can not define foreign key references on array. At first we want to use CHECK constraint, but those CHECK constraints in PostgreSQL does not support nested query.
 \par
-\#Use ARRAY + TRIGGER .vs. Use extra table + foreign keys
+So we have to use triggers to ensure the references if we want to use arrays in our tables. Or we can use extra relationship tables and foreign keys in an old way. It is ARRAY + TRIGGERS vs TABLE + FOREIGN KEY. We choose the latter in our final design and we have two reasons:
 \par
-\#About Account supertable referencing (TRIGGER)
+\begin{enumerate}
+\item Using so many triggers is inefficient. For every many-to-many relationship, if we use arrays, we have to create triggers on every foreign key constraint. The triggers are for the action taken after update and delete. If we want to ensure participation constraints, we have to create triggers before insert. We do not want to write so many triggers. Using build-in foreign key constraints of PostgreSQL is fine with us.
+\item Space efficiencies are asymptotically equal. Stroing the reference ids in array or table takes exactly the same space. Even if we compare the space taken by managing array structure or by managing new table, those two ways have same space complexities.
+\item Class methods are global in PostgreSQL. We define some methods that return required tuples in our original design before. PostgreSQL stores all functions under schema, not table. That means if we move the array references out of table into a new relationship table, all functions in PostgreSQL have same accessibility.
+\end{enumerate}
+\par
+So we decide to use extra relationship tables and foreign key references to store all many-to-many relationships. We also have some methods under the schema to provide us some object-oriented features to simplify our query.
+\par
+There is another problem that our authorizes table needs to refer to Account table. We know that Account table actually has no tuples (we talked about this in section \ref{sec:ptype}). We need to create triggers for this particular foreign key constraint.
 
 \subsubsection{CCDB Database on PostgreSQL}
+\par
+PostgreSQL has some object-relational database features. But many of them are different from what we think about. In this section we cretae our CCDB system on PostgreSQL. Before we go into details, we create a new UML class diagram for CCDB under PostgreSQL, as shown in Figure \ref{fig:newumlccdb}.
+\par
+We remove the package Account, and move owner attribute from OrgAccount and PerAccount to interface Account. The real foreign constraints will define in class OrgAccount and PerAccount. Also, we omit all 0..* labels on association lines. Finally, all functions are grouped in a yellow box, which indicates the schema function library.
+
+\begin{figure}[!htp]
+\centering
+\renewcommand{\umldrawcolor}{black}
+\renewcommand{\umlfillcolor}{blue!10}
+\begin{tikzpicture}
+    \begin{interface}[text width=4cm]{Account}{0,0}
+        \attribute{number : text}
+        \attribute{balance : numeric}
+        \attribute{limit : numeric}
+        \attribute{owner : text}
+    \end{interface}
+
+    \begin{class}[text width=2.5cm]{OrgAccount}{-5,-4}
+        \implement{Account}
+    \end{class}
+
+    \begin{class}[text width=2.5cm]{PerAccount}{5,-4}
+        \implement{Account}
+    \end{class}
+    \begin{class}[text width=5cm]{Organization}{-5,-7}
+        \attribute{id : text}
+        \attribute{name : text}
+        \attribute{address : text}
+    \end{class}
+    \begin{class}[text width=5cm]{Person}{5,-7}
+        \attribute{id : text}
+        \attribute{name : text}
+        \attribute{address: text}
+        \attribute{dob : date}
+    \end{class}
+
+    \begin{class}[text width=5cm]{Signs}{-3,-10}
+        \attribute{pid : text}
+        \attribute{oid : text}
+    \end{class}
+
+    \begin{class}[text width=5cm]{Authorizes}{3,-10}
+        \attribute{cid : text}
+        \attribute{pid : text}
+    \end{class}
+
+    %\association{OrgAccount}{}{1..1}{Organization}{0..*}{}
+    \draw [umlcd style] (OrgAccount) -- (Organization) node[near start, right]{1..1};
+    %\association{PerAccount}{}{1..1}{Person}{0..*}{}
+    \draw [umlcd style] (PerAccount) -- (Person) node[near start, right]{1..1};
+
+    %\association{Organization}{0..*}{}{Person}{}{0..*}
+
+    \draw [umlcd style] (Person.west |- 5, -9) -- (Organization.east |- -5, -9);
+
+    \draw [umlcd style] (Account) -- (0,-8);
+    \draw [umlcd style] (Person.west |- 5, -8) -- (0,-8);
+
+    \draw [umlcd style dashed line] (-1, -9) -- (-1, -10);
+    \draw [umlcd style dashed line] (1, -8) -- (1, -10);
+
+    \node [draw, rectangle, align=left, fill=yellow!20] at (0, -15) {
+ +getAuthorizedUsers(Account) : Person[] \\
+ +getOOwner(Account) : Organzation \\
+ +getPOwner(Account) : Person \\
+ +getAccounts(Organization) : Account[] \\
+ +getAccounts(Person) : Account[] \\
+ +getSigners(Organization) : Person[] \\
+ +getSignableOrgs(Person) : Organization[] \\
+ +getAuthAccounts(Person) : Account[]};
+
+\end{tikzpicture}
+\caption{New UML diagram for CCDB}
+\label{fig:newumlccdb}
+\end{figure}
+
 
 \paragraph{Using User-Defined Types in PostgreSQL}
 
 \par
-One of the important object-oriented features is user-defined types. PostgreSQL has UDTs but does not support the inheritance of UDTs. Instead PostgreSQL provides table inheritance.
+One of the important object-oriented features is user-defined types. PostgreSQL has UDTs but does not support the inheritance of UDTs. In our database, three UDTs are defined as accountType, organizationType and personType. The SQL commands are as follows:
 
-We also create Authorizes table for the relation Authorizes. The tricky part is the foreign key is pointing to a supertable, which rises trouble in PostgreSQL. In PostgreSQL, we create triggers to ensure the consistency. One trigger executes before insert or update on Authorizes. The other one executes after update or delete on Account. We will talk about triggers later in Object-oriented design of CCDB in section ?.?.?.
+\begin{verbatim}
+CREATE TYPE public.accounttype AS
+   ("number"  text,
+    "balance" numeric,
+    "limit"   numeric,
+    "owner"   text);
+
+CREATE TYPE public.organizationtype AS
+   ("oid"     text,
+    "name"    text,
+    "address" text);
+
+CREATE TYPE public.persontype AS
+   ("pid"     text,
+    "name"    text,
+    "address" text,
+    "dob"     date);
+\end{verbatim}
 
 \paragraph{Table Inheritance in PostgreSQL}
+\par
+PostgreSQL provides table inheritance. Based on the types and inheritance relationship, five tables are created as Account, OrgAccount, PerAccount, Organization and Person. We also create two relationship tables signs and authorizes. We include all primary key constraints and foreign key constraints as many as possible here.
 
-\paragraph{Functions}
+\begin{verbatim}
+CREATE TABLE public."Account"
+OF accounttype
+(
+  "number" WITH OPTIONS  NOT NULL,
+-- Inherited from type accounttype: "balance",
+-- Inherited from type accounttype: "limit",
+  "owner" WITH OPTIONS  NOT NULL,
+  CONSTRAINT account_pkey PRIMARY KEY (number)
+);
+
+CREATE TABLE public."OrgAccount"
+(
+-- Inherited from table "Account":  "number" text NOT NULL,
+-- Inherited from table "Account":  "balance" numeric,
+-- Inherited from table "Account":  "limit" numeric,
+-- Inherited from table "Account":  "owner" text NOT NULL,
+  CONSTRAINT "OrgAccount_pkey" PRIMARY KEY (number),
+  CONSTRAINT "OrgAccount_owner_fkey" FOREIGN KEY (owner)
+      REFERENCES public."Organization" (oid) MATCH SIMPLE
+      ON UPDATE CASCADE ON DELETE CASCADE
+)
+INHERITS (public."Account");
+
+CREATE TABLE public."PerAccount"
+(
+-- Inherited from table "Account":  "number" text NOT NULL,
+-- Inherited from table "Account":  "balance" numeric,
+-- Inherited from table "Account":  "limit" numeric,
+-- Inherited from table "Account":  "owner" text NOT NULL,
+  CONSTRAINT "PerAccount_pkey" PRIMARY KEY (number),
+  CONSTRAINT "PerAccount_owner_fkey" FOREIGN KEY (owner)
+      REFERENCES public."Person" (pid) MATCH SIMPLE
+      ON UPDATE CASCADE ON DELETE CASCADE
+)
+INHERITS (public."Account");
+
+CREATE TABLE public."Organization"
+OF organizationtype
+(
+  oid WITH OPTIONS  NOT NULL,
+-- Inherited from type organizationtype: name,
+-- Inherited from type organizationtype: address,
+  CONSTRAINT organization_pkey PRIMARY KEY (oid)
+);
+
+CREATE TABLE public."Person"
+OF persontype
+(
+  pid WITH OPTIONS  NOT NULL,
+-- Inherited from type persontype: name,
+-- Inherited from type persontype: address,
+-- Inherited from type persontype: dob,
+  CONSTRAINT person_pkey PRIMARY KEY (pid)
+);
+
+CREATE TABLE public.signs
+(
+  pid text NOT NULL,
+  oid text NOT NULL,
+  CONSTRAINT signs_pkey PRIMARY KEY (pid, oid),
+  CONSTRAINT signs_oid_fkey FOREIGN KEY (oid)
+      REFERENCES public."Organization" (oid) MATCH SIMPLE
+      ON UPDATE CASCADE ON DELETE CASCADE,
+  CONSTRAINT signs_pid_fkey FOREIGN KEY (pid)
+      REFERENCES public."Person" (pid) MATCH SIMPLE
+      ON UPDATE CASCADE ON DELETE CASCADE
+);
+
+CREATE TABLE public.authorizes
+(
+  cid text NOT NULL,
+  pid text NOT NULL,
+  CONSTRAINT authorizes_pkey PRIMARY KEY (cid, pid),
+  CONSTRAINT authorizes_pid_fkey FOREIGN KEY (pid)
+      REFERENCES public."Person" (pid) MATCH SIMPLE
+      ON UPDATE CASCADE ON DELETE CASCADE
+);
+\end{verbatim}
 
 \paragraph{Triggers}
+\par
+We talked about we need triggers to ensure the constraints pointing to a supertable in section \ref{sec:refinpgsql}. We create two triggers. One executes before insert or update on table authorizes. The other one executes after update or delete on Account. But since the real data is stored in OrgAccount and PerAccount, we should create triggers on OrgAccount and PerAccount.
 
+\begin{verbatim}
+CREATE OR REPLACE FUNCTION public.tf_iu_authorizes()
+  RETURNS trigger AS
+$BODY$
+  BEGIN
+    -- Check the insert/update row has correct account number in text array owns
+    IF (NEW.cid IN (SELECT pa.number FROM "PerAccount" pa)) OR (NEW.cid IN (SELECT oa.number FROM "OrgAccount" oa)) THEN
+      RETURN NEW;
+    END IF;
+    RAISE EXCEPTION '% is not a valid account number.', NEW.cid;
+  END;
+$BODY$
+  LANGUAGE plpgsql;
 
+CREATE TRIGGER tf_iu_authorizes
+  BEFORE INSERT OR UPDATE
+  ON public.authorizes
+  FOR EACH ROW
+  EXECUTE PROCEDURE public.tf_iu_authorizes();
+
+CREATE OR REPLACE FUNCTION public.tf_ud_account()
+  RETURNS trigger AS
+$BODY$
+  BEGIN
+    -- Check the insert/update row has correct account number in text array owns
+    IF (TG_OP = 'DELETE') THEN
+      DELETE from authorizes WHERE cid = OLD.number;
+      RETURN OLD;
+    ELSEIF (NOT NEW.number = OLD.number) THEN
+      UPDATE authorizes SET cid = NEW.number WHERE cid = OLD.number;
+      RETURN NEW;
+    END IF;
+    RETURN NULL; -- result is ignored since this is an AFTER trigger
+  END;
+$BODY$
+  LANGUAGE plpgsql;
+
+CREATE TRIGGER tf_ud_orgaccount
+  AFTER UPDATE OR DELETE
+  ON public."OrgAccount"
+  FOR EACH ROW
+  EXECUTE PROCEDURE public.tf_ud_account();
+
+CREATE TRIGGER tf_ud_peraccount
+  AFTER UPDATE OR DELETE
+  ON public."PerAccount"
+  FOR EACH ROW
+  EXECUTE PROCEDURE public.tf_ud_account();
+\end{verbatim}
+
+\paragraph{Functions} PostgreSQL allows function overloading. We create several basic functions to satifsy our need. For the required query, we also create some helper functions. We will talk about that in section \ref{query}.
+
+\begin{verbatim}
+CREATE OR REPLACE FUNCTION public.getAuthorizedUsers("Account")
+  RETURNS SETOF "Person" AS
+' SELECT p.* FROM "Person" p, authorizes a WHERE $1.number = a.cid AND a.pid = p.pid '
+  LANGUAGE sql;
+
+CREATE OR REPLACE FUNCTION public.getOOwner("Account")
+  RETURNS SETOF "Organization" AS
+' SELECT * FROM "Organization" o WHERE o.oid = $1.owner '
+  LANGUAGE sql;
+
+CREATE OR REPLACE FUNCTION public.getPOwner("Account")
+  RETURNS SETOF "Person" AS
+' SELECT * FROM "Person" p WHERE p.pid = $1.owner '
+  LANGUAGE sql;
+
+CREATE OR REPLACE FUNCTION public.getAccounts("Organization")
+  RETURNS SETOF "Account" AS
+' SELECT * FROM "OrgAccount" a WHERE a.owner = $1.oid '
+  LANGUAGE sql;
+
+CREATE OR REPLACE FUNCTION public.getAccounts("Person")
+  RETURNS SETOF "Account" AS
+' SELECT * FROM "PerAccount" a WHERE a.owner = $1.pid '
+  LANGUAGE sql;
+
+CREATE OR REPLACE FUNCTION public.getSigner("Organization")
+  RETURNS SETOF "Person" AS
+' SELECT a.* FROM "Person" a, signs s WHERE $1.oid = s.oid AND a.pid = s.pid '
+  LANGUAGE sql;
+
+CREATE OR REPLACE FUNCTION public.getSignableOrgs("Person")
+  RETURNS SETOF "Organization" AS
+' SELECT o.* FROM "Organization" o, signs s WHERE $1.pid = s.pid AND o.oid = s.oid '
+  LANGUAGE sql;
+
+CREATE OR REPLACE FUNCTION public.getAuthAccounts("Person")
+  RETURNS SETOF "Account" AS
+' SELECT a.* FROM "Account" a, authorizes s WHERE $1.pid = s.pid AND s.cid = a.number '
+  LANGUAGE sql;
+\end{verbatim}
 
 
 \end{document}
