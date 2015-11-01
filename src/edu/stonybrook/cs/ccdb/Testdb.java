@@ -8,7 +8,7 @@ public class Testdb {
 		Statement stmt;
 		ResultSet rs;
 		
-		String sql = "select * from test";
+		//String sql = "select * from \"Account\"";
 		
 		try {
 			Class.forName("org.postgresql.Driver");
@@ -22,9 +22,12 @@ public class Testdb {
 			conn = DriverManager.getConnection(Configuration.URL, Configuration.USR, Configuration.PWD);
 			System.out.println("Success connecting server!");
 			stmt = conn.createStatement(ResultSet.TYPE_SCROLL_SENSITIVE, ResultSet.CONCUR_UPDATABLE);
-			rs = stmt.executeQuery(sql);
+			rs = stmt.executeQuery(Configuration.QUERY[0]);
+			int k = rs.getMetaData().getColumnCount();
 			while (rs.next()) {
-				System.out.println(rs.getString(1) + " " + rs.getString(2));
+				for (int i = 1; i <= k; i++)
+					System.out.print(rs.getString(i) + " ");
+				System.out.println();
 			}
 			rs.close();
 			stmt.close();
