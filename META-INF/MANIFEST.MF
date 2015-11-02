@@ -1,0 +1,5 @@
+Manifest-Version: 1.0
+Bundle-ManifestVersion: 2
+Bundle-Name: ccdb_oo
+Bundle-SymbolicName: ccdb_oo
+Bundle-Version: 1.0.0.qualifier
