@@ -1,7 +1,7 @@
 % @Author: Yinlong Su
 % @Date:   2015-10-30 16:15:47
 % @Last Modified by:   Yinlong Su
-% @Last Modified time: 2015-10-31 19:17:42
+% @Last Modified time: 2015-11-02 16:54:57
 
 \documentclass[11pt]{article}
 \usepackage{pgf-umlcd}
@@ -31,7 +31,7 @@
 \maketitle
 
 \section{Database Design}
-Something of design
+Something about design, general
 
 \subsection{Entity-Relationship Design}
 After a series of consideration, we decided the final Entity-Relationship Model as Figure \ref{fig:erccdb}.
@@ -617,7 +617,7 @@ CREATE TRIGGER tf_ud_peraccount
 \paragraph{Functions} PostgreSQL allows function overloading. We create several basic functions to satifsy our need. For the required query, we also create some helper functions. We will talk about that in section \ref{query}.
 
 \begin{verbatim}
-CREATE OR REPLACE FUNCTION public.getAuthorizedUsers("Account")
+CREATE OR REPLACE FUNCTION public.getAuthUsers("Account")
   RETURNS SETOF "Person" AS
 ' SELECT p.* FROM "Person" p, authorizes a WHERE $1.number = a.cid AND a.pid = p.pid '
   LANGUAGE sql;
@@ -642,7 +642,7 @@ CREATE OR REPLACE FUNCTION public.getAccounts("Person")
 ' SELECT * FROM "PerAccount" a WHERE a.owner = $1.pid '
   LANGUAGE sql;
 
-CREATE OR REPLACE FUNCTION public.getSigner("Organization")
+CREATE OR REPLACE FUNCTION public.getSigners("Organization")
   RETURNS SETOF "Person" AS
 ' SELECT a.* FROM "Person" a, signs s WHERE $1.oid = s.oid AND a.pid = s.pid '
   LANGUAGE sql;
@@ -658,5 +658,133 @@ CREATE OR REPLACE FUNCTION public.getAuthAccounts("Person")
   LANGUAGE sql;
 \end{verbatim}
 
+\paragraph{Indexes} Query Optimizer can take advantage of indexes to produce better execution plans. We want to speed up our queries and improve the performance of our Web applications. Although we can create indexes for every column used in our queries, PostgreSQL would waste space and time to determine which indexes to use. Meanwhile, extra cost will be added into operations like inserts, updates and deletes since indexes need to be updated. The indexes we created will be described in section \ref{sec:qando} along with queries.
+
+\section{Queries and Optimizations}
+\label{sec:qando}
+The queries are the same as Project 1. PostgreSQL has not support universal quantification, so we convert query 3 into double-negation form. As for query 4 and 5, we created recursive queries using common table expressions.
+
+\subsection{Query 1}
+Find all pairs of the form (user,signer), where user is an authorized user of an organization's credit card, signer is a person at that organization with signature authority, and the balance on the card is within \$1,000 of the credit limit. For each user/signer, show Id and Name. (TODO: SOMETHING ABOUT AUTHORIZED USER DEFINE HERE)
+
+\paragraph{Supporting functions} We already have all the supporting functions defined. What we need are getAuthUsers(Account), getOOwner(Account) and getSigners(Organization).
+
+\paragraph{Indexes} Nothing here yet
+
+\paragraph{Query SQL statement} Using functions we talked above, we can build our query statement succinctly.
+\begin{verbatim}
+SELECT au.pid, au.name, s.pid, s.name
+FROM "OrgAccount" oa, getAuthUsers(oa) au, getOOwner(oa) oo, getSigners(oo) s
+WHERE oa.balance - oa.limit <= 1000 AND oa.balance - oa.limit >= -1000;
+\end{verbatim}
+
+\paragraph{Performance} Nothing here yet
+
+\subsection{Query 2}
+Find all users (Id, Name) who own four or more cards and are authorized non-owner users for three or more other cards.
+
+\paragraph{Supporting functions} We defined two supporting functions to this query: getAccountNumber(Person) and getAuthAccountNumber(Person).
+\begin{verbatim}
+CREATE OR REPLACE FUNCTION public.getAccountNumber("Person")
+  RETURNS bigint AS
+' SELECT count(*) FROM getAccounts($1)'
+  LANGUAGE sql;
+
+CREATE OR REPLACE FUNCTION public.getAuthAccountNumber("Person")
+  RETURNS bigint AS
+' SELECT count(*) FROM getAuthAccounts($1) '
+  LANGUAGE sql;
+\end{verbatim}
+
+\paragraph{Indexes} Nothing here yet
+
+\paragraph{Query SQL statement}
+\begin{verbatim}
+SELECT p.pid, p.name
+FROM "Person" p
+WHERE getAccountNumber(p)>=4 AND getAuthAccountNumber(p)>=3;
+\end{verbatim}
+
+\paragraph{Performance} Nothing here yet
+
+\subsection{Query 3}
+Find the credit cards (acct. numbers) all of whose signers (i.e., people with signature authority of the organizations that own those cards) also own personal credit cards with credit limits at least \$25,000.
+
+\paragraph{Supporting functions} We defined one supporting function getMaxLimit(Person) to this query.
+\begin{verbatim}
+CREATE OR REPLACE FUNCTION public.getMaxLimit("Person")
+  RETURNS numeric AS
+' SELECT max(a.limit) FROM getAccounts($1) a '
+  LANGUAGE sql;
+\end{verbatim}
+
+\paragraph{Indexes} Nothing here yet
+
+\paragraph{Query SQL statement} Since PostgreSQL does not support universal quantification, we have to use double-negation to create equivalent query. We convert ``for all ... at least'' to ``not exist ... less than''.
+\begin{verbatim}
+SELECT DISTINCT a.number
+FROM "Account" a, getOOwner(a) oo, getSigners(oo) s
+WHERE NOT getMaxLimit(s) < 25000;
+\end{verbatim}
+
+\paragraph{Performance} Nothing here yet
+
+\subsection{Query 4}
+Find all pairs (U,C) where U is an indirect user of the credit card C. (For each user, show Id and Name. For credit cards, show the account number.)
+
+\paragraph{Supporting functions} We need to define a new function that returns proper authorized users. Basically it is getAuthUsers function plus getSigners if the card owner is an organization.
+\begin{verbatim}
+CREATE OR REPLACE FUNCTION public.getNonOwnerAuthUsers("Account")
+  RETURNS SETOF "Person" AS
+$BODY$
+  SELECT p.* FROM "Person" p, authorizes a WHERE $1.number = a.cid AND a.pid = p.pid
+  UNION
+  -- union signer if owner is an organization
+  SELECT p.* FROM "Person" p, signs s WHERE $1.owner = s.oid AND s.pid = p.pid
+$BODY$
+  LANGUAGE sql;
+\end{verbatim}
+
+\paragraph{Indexes} Nothing here yet
+
+\paragraph{Query SQL statement} WITH statement (CTE) is used in this query to do recursive query.
+\begin{verbatim}
+WITH RECURSIVE indirect_user(pid, name, number) AS (
+    SELECT aa.pid, aa.name, a.number
+    FROM "Account" a, getNonOwnerAuthUsers(a) aa
+  UNION
+    SELECT aa.pid, aa.name, iu.number
+    FROM indirect_user iu, "Person" p, "Account" a, getNonOwnerAuthUsers(a) aa
+    WHERE iu.pid = p.pid AND a.owner = p.pid
+)
+SELECT *
+FROM indirect_user;
+\end{verbatim}
+
+\paragraph{Performance} Nothing here yet
+
+\subsection{Query 5}
+Find the total of all balances for the credit cards that have Joe as one of the indirect users.
+
+\paragraph{Supporting functions} Same as Query 4.
+
+\paragraph{Indexes} Nothing here yet
+
+\paragraph{Query SQL statement} WITH statement (CTE) is used in this query to do recursive query.
+\begin{verbatim}
+WITH RECURSIVE indirect_user(pid, name, number) AS (
+    SELECT aa.pid, aa.name, a.number
+    FROM "Account" a, getNonOwnerAuthUsers(a) aa
+  UNION
+    SELECT aa.pid, aa.name, iu.number
+    FROM indirect_user iu, "Person" p, "Account" a, getNonOwnerAuthUsers(a) aa
+    WHERE iu.pid = p.pid AND a.owner = p.pid
+)
+SELECT sum(a.balance)
+FROM indirect_user iu, "Account" a
+WHERE iu.name = 'Joe' AND iu.number = a.number;
+\end{verbatim}
+
+\paragraph{Performance} Nothing here yet
 
 \end{document}
