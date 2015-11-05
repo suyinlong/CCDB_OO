@@ -1,19 +1,14 @@
 package edu.stonybrook.cs.ccdb;
 
 import java.io.IOException;
+import java.io.PrintWriter;
 import java.sql.*;
-import java.util.ArrayList;
-import java.util.List;
 
 import javax.servlet.ServletException;
 import javax.servlet.annotation.WebServlet;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-import javax.servlet.RequestDispatcher;
-
-//import javax.servlet.jsp.jstl.sql.Result;
-//import javax.servlet.jsp.jstl.sql.ResultSupport;
 import java.sql.ResultSet;
 /**
  * Servlet implementation class GetAccountServlet
@@ -25,17 +20,20 @@ public class GetAccountServlet extends HttpServlet {
 	 * @see HttpServlet#doGet(HttpServletRequest request, HttpServletResponse response)
 	 */
 	protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
-		List<Account> accountList = new ArrayList<>();
 		Connection conn;
 		Statement stmt;
 		ResultSet rs;
+
+
+		String query = request.getParameter("Query");
+		System.out.println(query);
+		String sql;
 		
-		Account account = null;
+		if( query.equals("q1") );
+		{
+			sql = Configuration.QUERY[0];
+		}
 		
-		String sql = "select * from \"Account\"";
-		//String requestStr = IOUtils.toString(request.getInputStream());
-		//String sql = request.toString();
-		System.out.println(request.getQueryString());
 		
 		try {
 			Class.forName("org.postgresql.Driver");
@@ -51,17 +49,40 @@ public class GetAccountServlet extends HttpServlet {
 			stmt = conn.createStatement(ResultSet.TYPE_SCROLL_SENSITIVE, ResultSet.CONCUR_UPDATABLE);
 			rs = stmt.executeQuery(sql);
 			
-			while (rs.next()) {
-				account = new Account();
-				account.SetNumber( rs.getString(1));
-				account.SetBalance( rs.getInt(2));
-				account.SetLimit( rs.getInt(3));
-				accountList.add(account);
+			PrintHTMLCommonBegin( request, response );
+			
+			int columnCnt = rs.getMetaData().getColumnCount();
+			PrintWriter out = response.getWriter();
+			
+			// Print the query
+			out.println( "<b>SQL Query</b>: " + sql );
+			out.println( "<b>Result</b>" );
+
+			out.println( "<table>" );
+			
+			// Print attributes
+			out.println( "<thead> <TR>" );
+			for( int i = 1; i <= columnCnt; ++i )
+			{
+				String label = rs.getMetaData().getColumnLabel( i );
+                out.println( "<TD>"+ label +"</TD>" );
+			}
+			out.println( "</thead> </TR>" );
+			
+			// Print results
+			while (rs.next())
+			{
+				out.println( "<TR align='left'>" );
+				for( int i = 1; i <= columnCnt; ++i )
+				{
+	                out.println( "<TD>"+ rs.getString(i) +"</TD>" );
+				}
+				out.println( "</TR>" );
 			}
 
-		    request.setAttribute("result", accountList);
-		    RequestDispatcher reqDispatcher = request.getRequestDispatcher("/AccountView.jsp");
-		    reqDispatcher.forward(request, response);
+			out.println( "</table>" );
+			
+			PrintHTMLCommonEnd( request, response );
 		        
 			rs.close();
 			stmt.close();
@@ -70,5 +91,32 @@ public class GetAccountServlet extends HttpServlet {
 			System.out.println("Connection URL or username or password errors!");
 			e.printStackTrace();
 		}
+	}
+	
+	private void PrintHTMLCommonBegin( HttpServletRequest request, HttpServletResponse response )
+					throws IOException
+	{
+		PrintWriter out = response.getWriter();
+        out.println (
+                  "<!DOCTYPE html PUBLIC \"-//W3C//DTD HTML 4.01 Transitional//EN\" +" +
+                      "http://www.w3.org/TR/html4/loose.dtd\">\n" +
+                  "<html> \n" +
+                    "<head> \n" +
+                      "<meta http-equiv=\"Content-Type\" content=\"text/html; " +
+                        "charset=ISO-8859-1\"> \n" +
+                      "<title> Crunchify.com JSP Servlet Example  </title> \n" +
+                    "</head> \n" +
+                    "<body> \n"
+                );
+	}
+
+	private void PrintHTMLCommonEnd( HttpServletRequest request, HttpServletResponse response )
+					throws IOException
+	{
+		PrintWriter out = response.getWriter();
+	    out.println (
+	              "</body> \n" +
+	              "</html>" 
+	            );
 	}
 }
