@@ -12,7 +12,7 @@
         <form method="get" action="GetAccountServlet">
             <h1>Quries</h1>
             <label>Query1</label>
-            <input type="text" name="q1" id="q1" value="select * from Account" />
+            <input type="text" name="Query" id="Query" value="q1" />
             <input type="submit" value="submit">
         </form>
     </body>
