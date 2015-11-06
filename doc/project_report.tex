@@ -1,7 +1,7 @@
 % @Author: Yinlong Su
 % @Date:   2015-10-30 16:15:47
 % @Last Modified by:   Yinlong Su
-% @Last Modified time: 2015-11-02 16:54:57
+% @Last Modified time: 2015-11-06 17:13:59
 
 \documentclass[11pt]{article}
 \usepackage{pgf-umlcd}
@@ -45,26 +45,21 @@ After a series of consideration, we decided the final Entity-Relationship Model 
 \node[attribute] (balance) [above right = of account] {Balance} edge (account);
 \node[attribute] (limit) [left = of account] {Limit} edge (account);
 
-\node[isa] (isa1) [draw] at (0, -2) {IsA} edge (account);
+\node[relationship] (owns) [draw] at (0, -3) {Owns} edge [<-, very thick] (account);
 
-\node[entity] (orgaccount) [draw] at (-2, -4) {OrgAccount} edge node [left] {disjoint} (isa1);
-\node[entity] (peraccount) [draw] at (2, -4) {PerAccount} edge node [right] {covering} (isa1);
+\node[entity] [draw] at (0, -6) (client) {Client} edge (owns);
+\node[attribute] (id) [above left = of client] {\key{Id}} edge (client);
+\node[attribute] (name) [left = of client] {Name} edge (client);
+\node[attribute] (address) [below left = of client] {Address} edge (client);
 
-\node[relationship] (owns1) [draw] at (-2, -7) {Owns} edge [<-, very thick] (orgaccount);
-\node[relationship] (owns2) [draw] at (2, -7) {Owns} edge [<-, very thick] (peraccount);
+\node[isa] (isa1) [draw] at (0, -8) {IsA} edge (client);
 
-\node[entity] (organization) [draw] at (-2, -10) {Organization} edge (owns1);
-\node[attribute] (id) [left = of organization] {\key{Id}} edge (organization);
-\node[attribute] (name) [below left = of organization] {Name} edge (organization);
-\node[attribute] (address) [below = of organization] {Address} edge (organization);
+\node[entity] (organization) [draw] at (-4, -11) {Organization} edge node [left] {disjoint} (isa1);
 
-\node[entity] (person) [draw] at (4, -10) {Person} edge (owns2);
-\node[attribute] (id) [above right = of person] {\key{Id}} edge (person);
-\node[attribute] (name) [right = of person] {Name} edge (person);
-\node[attribute] (address) [below right = of person] {Address} edge (person);
+\node[entity] (person) [draw] at (4, -11) {Person} edge node [right] {covering} (isa1);
 \node[attribute] (dob) [below = of person] {DOB} edge (person);
 
-\node[relationship] (signs) [draw] at (1, -10) {Signs} edge (organization) edge (person);
+\node[relationship] (signs) [draw] at (0, -11) {Signs} edge (organization) edge (person);
 
 \node [relationship] (authorizes) [draw] at (4, 0) {Authorizes} edge (account) edge(person);
 
@@ -77,50 +72,42 @@ After a series of consideration, we decided the final Entity-Relationship Model 
 \label{sec:E-R design}
 
 \par
-Since the owner of a credit card account can be either a person or an organization, we split the accounts into two types: Personal Account and Organizational Account. This partition on Account satifies the disjointness constraint and covering constraint.
+Since the owner of a credit card account can be either a person or an organization, we create a supertype Client. Every entity of type Organization and Person are subtypes of Client. This partition on Client satifies the disjointness constraint and covering constraint.
 
 \par
-After splitting the Account entity type into PerAccount and OrgAccount, we also split the relationship ``Owns''. But we don't need extra table to store these relationships. In fact, every account can have just one owner, no more and no less. We draw an arrow pointing in the direction of the relationship's diamond in very thick lines. We know that account Number is a key of PerAccount and also of PersonOwns. Thus, we can merge the attributes of PersonOwns into PerAccount. It is guaranteed that each PerAccount tuple has exactly one corresponding PersonOwns tuple, so no redundancy is created. Then we can concatenate PerAccount and PersonOwns tuples which have same account number, and the same goes to OrgAccount and OrganizationOwns.
+This supertype make it easy for us to define a proper foreign key constraint in Account table. The relationship ``Owns''does not need extra table to store these relationships. In fact, every account can have exactly one owner, no more and no less. We draw an arrow pointing in the direction of the relationship's diamond in thick lines. We know that account Number is a key of Account and Owns. Thus, we can merge the attributes of Owns into Account. It is guaranteed that each Account tuple has exactly one corresponding Owns tuple, so no redundancy is created. Then we can concatenate Account and Owns tuples which have same account number to table AccountMergeWithOwns. For simplicity, we just call it Account.
 
 \par
-The relationship Signs and Authorizes are many-to-many relationships. We have to create tables to store the relation, and define proper foreign keys.
+The relationship Signs and Authorizes are many-to-many relationships. We have to create tables to store the relations, and define proper foreign keys.
 
 \subsubsection{Relational Database Schemas}
 \par
-Now we can convert the E-R diagram to relational database schemas. Noting that here we assume there is no inheritance and other object-oriented features. We keep Person and Organization entities. For account type hierarchy, we represent the IsA relationship in general representation. That means we create Account table stroing all information except owner. And table PerAccount and OrgAccount both have a foreign key pointing to Account and another foreign key pointing to the corresponding owner. The relationship Owns has been merged into PerAccount and OrgAccount. The SQL CREATE statements are as follows.
+Now we can convert the E-R diagram to relational database schemas. Noting that here we assume there is no inheritance and other object-oriented features. We keep Person and Organization entities. For client type hierarchy, we represent the IsA relationship in general representation. That means we create Client table stroing all information. And table Organization and Person both have a foreign key pointing to Client. The relationship Owns has been merged into Account. The SQL CREATE statements are as follows.
 \begin{verbatim}
-CREATE TABLE Person (
-    Id      CHAR(20),
-    Name    CHAR(20),
-    Address CHAR(50),
-    Dob     DATE,
-    PRIMARY KEY (Id) )
-
-CREATE TABLE Organization (
-    Id      CHAR(20),
-    Name    CHAR(20),
-    Address CHAR(50)
-    PRIMARY KEY (Id) )
-
 CREATE TABLE Account (
     Number  CHAR(20),
     Balance DECIMAL,
     Limit   DECIMAL,
-    PRIMARY KEY (Number) )
-
-CREATE TABLE PerAccount (
-    Number  CHAR(20),
     Owner   CHAR(20) NOT NULL,
-    PRIMARY KEY (Number),
-    FOREIGN KEY (Number) REFERENCES Account(Number),
-    FOREIGN KEY (Owner) REFERENCES Person(Id) )
+    PRIMARY KEY (Number)
+    FOREIGN KEY (Owner) REFERENCES Client(Id) )
 
-CREATE TABLE OrgAccount (
-    Number  CHAR(20),
-    Owner   CHAR(20) NOT NULL,
-    PRIMARY KEY (Number),
-    FOREIGN KEY (Number) REFERENCES Account(Number),
-    FOREIGN KEY (Owner) REFERENCES Organization(Id) )
+CREATE TABLE Client (
+    Id      CHAR(20),
+    Name    CHAR(20),
+    Address CHAR(50),
+    PRIMARY KEY (Id) )
+
+CREATE TABLE Organization (
+    Id      CHAR(20),
+    PRIMARY KEY (Id),
+    FOREIGN KEY (Id) REFERENCES Client(Id) )
+
+CREATE TABLE Person (
+    Id      CHAR(20),
+    Dob     DATE,
+    PRIMARY KEY (Id),
+    FOREIGN KEY (Id) REFERENCES Client(Id) )
 
 CREATE TABLE Signs (
     Pid CHAR(20),
@@ -143,43 +130,34 @@ CREATE TABLE Authorizes (
 The object-relational database concept provides us some very exciting features which will tremendously simplify the database schemas and query statements. Based on SQL 1999/2003 object extensions, we designed a draft schema of object-relational design of CCDB. The UML class diagram is shown as Figure \ref{fig:umlccdb}, and we also created the ODL-style schema.
 
 \begin{verbatim}
-interface Account: Object
+class Account: Object
     ( key: number )
 {
     attribute string number;
     attribute numeric balance;
     attribute numeric limit;
+    relationship Client owner inverse Client::accounts;
     relationship Set<Person> authorizerdUsers inverse Person::authorizedAccounts;
 }
 
-class PerAccount: Account
-{
-    relationship Person owner inverse Person::accounts;
-}
-
-class OrgAccount: Account
-{
-    relationship Organization owner inverse Organization:accounts;
-}
-
-class Organization
-    ( key: id )
+class Client: Object
 {
     attribute string id;
     attribute string name;
     attribute string address;
-    relationship SET<Account> accounts inverse OrgAccount::owner;
+    relationship SET<Account> accounts inverse Account::owner;
+}
+
+class Organization: Client
+    ( key: id )
+{
     relationship SET<Person> signers inverse Person::id;
 }
 
-class Person
+class Person: Client
     ( key: id )
 {
-    attribute string id;
-    attribute string name;
-    attribute string address;
     attribute date dob;
-    relationship SET<Account> accounts inverse PerAccount::owner;
     relationship SET<Organization> signOrgs inverse Orgnization::id;
     relationship SET<Account> authorizedAccounts inverse Account::authorizedUsers;
 }
@@ -188,60 +166,47 @@ class Person
 \begin{figure}[!htp]
 \centering
 \begin{tikzpicture}
-    \begin{package}{Accounts}
-        \begin{interface}[text width=7cm]{Account}{0,0}
-            \attribute{number : string}
-            \attribute{balance : numeric}
-            \attribute{limit : numeric}
-            \attribute{authorizedUsers : Person[]}
-            \operation{getAuthorizedUsers : Person[]}
-        \end{interface}
-
-        \begin{class}[text width=5cm]{OrgAccount}{-5,-6}
-            \attribute{owner : Organization}
-            \implement{Account}
-            \operation{getOwner() : Organzation}
+    \begin{class}[text width=7cm]{Account}{0,0}
+        \attribute{number : string}
+        \attribute{balance : numeric}
+        \attribute{limit : numeric}
+        \attribute{owner : Client}
+        \attribute{authorizedUsers : Person[]}
+        \operation{getOwner : Client}
+        \operation{getAuthorizedUsers : Person[]}
+    \end{class}
+    \begin{package}{Clients}
+        \begin{class}[text width=7cm]{Client}{0,-6}
+            \attribute{id : string}
+            \attribute{name : string}
+            \attribute{address : string}
+            \attribute{accounts : Account[]}
+            \operation{getAccounts : Account[]}
         \end{class}
-
-        \begin{class}[text width=5cm]{PerAccount}{5,-6}
-            \attribute{owner : Person}
-            \implement{Account}
-            \operation{getOwner() : Person}
+        \begin{class}[text width=5cm]{Organization}{-5,-10}
+            \attribute{signers : Person[]}
+            \inherit{Client}
+            \operation{getSigners : Person[]}
+        \end{class}
+        \begin{class}[text width=6cm]{Person}{5,-10}
+            \attribute{dob : date}
+            \attribute{signOrgs : Organization[]}
+            \attribute{authorizedAccounts : Account[]}
+            \inherit{Client}
+            \operation{getSignableOrgs() : Organization[]}
+            \operation{getAuthAccounts() : Account[]}
         \end{class}
     \end{package}
-    \begin{class}[text width=5cm]{Organization}{-5,-9}
-        \attribute{id : string}
-        \attribute{name : string}
-        \attribute{address : string}
-        \attribute{accounts : Account[]}
-        \attribute{signers : Person[]}
-        \operation{getAccounts : Account[]}
-        \operation{getSigners : Person[]}
-    \end{class}
-    \begin{class}[text width=6cm]{Person}{5,-9}
-        \attribute{id : string}
-        \attribute{name : string}
-        \attribute{address: string}
-        \attribute{dob : date}
-        \attribute{accounts : Account[]}
-        \attribute{signOrgs : Organization[]}
-        \attribute{authorizedAccounts : Account[]}
-        \operation{getAccounts() : Account[]}
-        \operation{getSignableOrgs() : Organization[]}
-        \operation{getAuthAccounts() : Account[]}
-    \end{class}
 
-    %\association{OrgAccount}{}{1..1}{Organization}{0..*}{}
-    \draw [umlcd style] (OrgAccount) -- (Organization) node[near start, right]{1..1} node[near end, left]{0..*};
-    %\association{PerAccount}{}{1..1}{Person}{0..*}{}
-    \draw [umlcd style] (PerAccount) -- (Person) node[near start, right]{1..1} node[near end, left]{0..*};
+    %\association{Account}{}{1..1}{Client}{0..*}{}
+    \draw [umlcd style] (Account) -- (Client) node[near start, right]{1..1} node[near end, left]{0..*};
 
     %\association{Organization}{0..*}{}{Person}{}{0..*}
+    \draw [umlcd style] (Person.west |- 5, -11) -- (Organization.east |- -5, -11) node[near start, below]{0..*} node[near end, above]{0..*};
 
-    \draw [umlcd style] (Person.west |- 5, -12) -- (Organization.east |- -5, -12) node[near start, below]{0..*} node[near end, above]{0..*};
+    \draw [umlcd style] (Account.east |- 0, -2) -- (5, -2) node[near start, above]{0..*};
+    \draw [umlcd style] (5, -2) -- (5, -10) node[near end, right]{0..*};
 
-    \draw [umlcd style] (Account) -- (0,-11) node[near start, right]{0..*};
-    \draw [umlcd style] (Person.west |- 5, -11) -- (0,-11) node[near start, above]{0..*};
 
 \end{tikzpicture}
 \caption{UML diagram for CCDB}
@@ -252,46 +217,46 @@ class Person
 With the power of object referencing, we can store all references into set-value types thus we do not need to create many relationship table/class. But unfortunately, PostgreSQL does not support all of the object-oriented features. In fact, it is very limited. Hence we have to adjust our design to cater to PostgreSQL.
 
 
-\subsubsection{Account Type Hierarchy}
+\subsubsection{Client Type Hierarchy}
 
 \par
-We have briefly talked about the split of account type in section \ref{sec:E-R design}. Now we describe it in detail. The first problem we encountered is that the owner of a credit card account can be either a person or an organization. Although the sample test data has different ids between Person and Organization, we can not assume all data satifsies this condition. If we add a new enum column, which labeling the owner type, into Account, then we can distingish it by $(ownerId, ownerType)$. But then we have another problem: we can not define a proper foreign key constraint under ownerId column.
+We have briefly talked about the supertype Client in section \ref{sec:E-R design}. Now we describe it in detail. The first problem we encountered is that the owner of a credit card account can be either a person or an organization. Although the sample test data has different ids between Person and Organization, we can not assume all data satifsies this condition. If we add a new enum column, which labeling the owner type, into Account, then we can distingish it by $(ownerId, ownerType)$. But then we have another problem: we can not define a proper foreign key constraint under ownerId column.
 
 \begin{wrapfigure}{R}{0.5\textwidth}
 \begin{tikzpicture}
-    \begin{package}{Accounts}
-        \begin{interface}[text width=3cm]{Account}{0,0}
+    \begin{package}{Clients}
+        \begin{class}[text width=3cm]{Client}{0,0}
             \attribute{...}
-            \operation{...}
-        \end{interface}
-
-        \begin{class}[text width=3cm]{OrgAccount}{-2,-2}
-            \attribute{...}
-            \inherit{Account}
             \operation{...}
         \end{class}
 
-        \begin{class}[text width=3cm]{PerAccount}{2,-2}
+        \begin{class}[text width=3cm]{Organization}{-2,-2}
             \attribute{...}
-            \inherit{Account}
+            \inherit{Client}
+            \operation{...}
+        \end{class}
+
+        \begin{class}[text width=3cm]{Person}{2,-2}
+            \attribute{...}
+            \inherit{Client}
             \operation{...}
         \end{class}
     \end{package}
 \end{tikzpicture}
-\caption{Hierarchy of Account Type}
-\label{fig:accounthierarchy}
+\caption{Hierarchy of Client Type}
+\label{fig:clienthierarchy}
 \end{wrapfigure}
 
 \par
-Therefore, we decided to split the accounts into two types: Personal Account and Organizational Account. All the attributes of Account type are applicable to subtype entities. We defined this IsA relationship that relates Account, PerAccount and OrgAccount. The role Sub refers to PerAccount and OrgAccount, while the role Super refers to Account. In the view of object-oriented, Account is a super class while PerAccount and OrgAccount are subclasses, as shown in Figure \ref{fig:accounthierarchy}. The subclasses inherit the features of the super class.
+Therefore, we decided to create a supertype Client. All the attributes of Client type are applicable to subtype entities. We defined this IsA relationship that relates Client, Organization and Person. The role Sub refers to Organization and Person, while the role Super refers to Client. In the view of object-oriented, Client is a super class while Organization and Person are subclasses, as shown in Figure \ref{fig:clienthierarchy}. The subclasses inherit the features of the super class.
 \par
-In addition, our partition on Account is disjoint. A credit card account can not be a personal account and an organizational account at the same time. Thus we will not have duplicate tuples when inserting data into non-disjoint subtypes in PostgreSQL (we will discuss it later in section \label{ref:ptype}). And the partition also satisfies the covering constraint since the union of the sets of instances PerAccount and OrgAccount equals the set of instances of Account.
+In addition, our partition on Client is disjoint. A client can not be a person and an organization at the same time. Thus we will not have duplicate tuples in subtables when inserting data into non-disjoint subtypes in PostgreSQL (we will discuss it later in section \label{ref:ptype}). And the partition also satisfies the covering constraint since the union of the sets of instances Organization and Person equals the set of instances of Client.
 \par
-We noticed that Person type and Organization type have many common attributes like id, name, address and they can both be the owner of a credit card account. A supertype, let us call it Owner, is not made for Person and Organization not only because we think those two types are essentially different but also they can not satisfy the covering constraint. If we create the Owner type for the convenience of defining the foreign key constraint of Account, then we can find some instances like `p2- John' in Person doesn't own any card.
+We noticed that Person type and Organization type have many common attributes like id, name, address and they can both be the owner of a credit card account. Using the inheritance of object-oriented view, we can define those attributes once and reuse it in subclasses.
 \par
 
 
-\subsubsection{Person Type Integrity}
+\subsubsection{Person Type}
 \label{sec:ptype}
 
 \begin{wrapfigure}{R}{0.5\textwidth}
@@ -314,7 +279,7 @@ We noticed that Person type and Organization type have many common attributes li
         \operation{...}
     \end{class}
 \end{tikzpicture}
-\caption{Early partition on Person}
+\caption{Rejected partition on Person}
 \label{fig:personhierarchy}
 \end{wrapfigure}
 
@@ -385,66 +350,57 @@ We remove the package Account, and move owner attribute from OrgAccount and PerA
 \renewcommand{\umldrawcolor}{black}
 \renewcommand{\umlfillcolor}{blue!10}
 \begin{tikzpicture}
-    \begin{interface}[text width=4cm]{Account}{0,0}
+    \begin{class}[text width=4cm]{Account}{-2,0}
         \attribute{number : text}
         \attribute{balance : numeric}
         \attribute{limit : numeric}
         \attribute{owner : text}
-    \end{interface}
-
-    \begin{class}[text width=2.5cm]{OrgAccount}{-5,-4}
-        \implement{Account}
     \end{class}
 
-    \begin{class}[text width=2.5cm]{PerAccount}{5,-4}
-        \implement{Account}
-    \end{class}
-    \begin{class}[text width=5cm]{Organization}{-5,-7}
+    \begin{class}[text width=4cm]{Client}{-2,-4}
         \attribute{id : text}
         \attribute{name : text}
         \attribute{address : text}
     \end{class}
-    \begin{class}[text width=5cm]{Person}{5,-7}
-        \attribute{id : text}
-        \attribute{name : text}
-        \attribute{address: text}
+
+    \begin{class}[text width=4cm]{Organization}{-6,-8}
+        \inherit{Client}
+    \end{class}
+    \begin{class}[text width=4cm]{Person}{2,-8}
         \attribute{dob : date}
+        \inherit{Client}
     \end{class}
 
-    \begin{class}[text width=5cm]{Signs}{-3,-10}
+    \begin{class}[text width=4cm]{Signs}{-2,-10}
         \attribute{pid : text}
         \attribute{oid : text}
     \end{class}
 
-    \begin{class}[text width=5cm]{Authorizes}{3,-10}
+    \begin{class}[text width=4cm]{Authorizes}{5,0}
         \attribute{cid : text}
         \attribute{pid : text}
     \end{class}
 
-    %\association{OrgAccount}{}{1..1}{Organization}{0..*}{}
-    \draw [umlcd style] (OrgAccount) -- (Organization) node[near start, right]{1..1};
-    %\association{PerAccount}{}{1..1}{Person}{0..*}{}
-    \draw [umlcd style] (PerAccount) -- (Person) node[near start, right]{1..1};
+    \draw [umlcd style] (Account) -- (Client) node[near start, right]{1..1};
 
-    %\association{Organization}{0..*}{}{Person}{}{0..*}
+    \draw [umlcd style] (Person.west |- 5, -8.5) -- (Organization.east |- -5, -8.5);
 
-    \draw [umlcd style] (Person.west |- 5, -9) -- (Organization.east |- -5, -9);
+    \draw [umlcd style] (Account.east |- 5, -1) -- (2, -1);
+    \draw [umlcd style] (2, -1) -- (2,-8);
 
-    \draw [umlcd style] (Account) -- (0,-8);
-    \draw [umlcd style] (Person.west |- 5, -8) -- (0,-8);
+    \draw [umlcd style dashed line] (-2, -8.5) -- (-2, -10);
+    \draw [umlcd style dashed line] (2, -1) -- (Authorizes.west |- 5, -1);
 
-    \draw [umlcd style dashed line] (-1, -9) -- (-1, -10);
-    \draw [umlcd style dashed line] (1, -8) -- (1, -10);
 
     \node [draw, rectangle, align=left, fill=yellow!20] at (0, -15) {
- +getAuthorizedUsers(Account) : Person[] \\
- +getOOwner(Account) : Organzation \\
- +getPOwner(Account) : Person \\
- +getAccounts(Organization) : Account[] \\
- +getAccounts(Person) : Account[] \\
+ +getAuthUsers(Account) : Person[] \\
+ +getOrgOwner(Account) : Organzation \\
+ +getPerOwner(Account) : Person \\
+ +getAccts(Organization) : Account[] \\
+ +getAccts(Person) : Account[] \\
  +getSigners(Organization) : Person[] \\
- +getSignableOrgs(Person) : Organization[] \\
- +getAuthAccounts(Person) : Account[]};
+ +getSignOrgs(Person) : Organization[] \\
+ +getAuthAccts(Person) : Account[]};
 
 \end{tikzpicture}
 \caption{New UML diagram for CCDB}
@@ -455,7 +411,7 @@ We remove the package Account, and move owner attribute from OrgAccount and PerA
 \paragraph{Using User-Defined Types in PostgreSQL}
 
 \par
-One of the important object-oriented features is user-defined types. PostgreSQL has UDTs but does not support the inheritance of UDTs. In our database, three UDTs are defined as accountType, organizationType and personType. The SQL commands are as follows:
+One of the important object-oriented features is user-defined types. PostgreSQL has UDTs but does not support the inheritance of UDTs. In our database, two UDTs are defined as accountType and clientType. The SQL commands are as follows:
 
 \begin{verbatim}
 CREATE TYPE public.accounttype AS
@@ -464,77 +420,57 @@ CREATE TYPE public.accounttype AS
     "limit"   numeric,
     "owner"   text);
 
-CREATE TYPE public.organizationtype AS
-   ("oid"     text,
+CREATE TYPE public.clienttype AS
+   ("id"     text,
     "name"    text,
     "address" text);
-
-CREATE TYPE public.persontype AS
-   ("pid"     text,
-    "name"    text,
-    "address" text,
-    "dob"     date);
 \end{verbatim}
 
 \paragraph{Table Inheritance in PostgreSQL}
 \par
-PostgreSQL provides table inheritance. Based on the types and inheritance relationship, five tables are created as Account, OrgAccount, PerAccount, Organization and Person. We also create two relationship tables signs and authorizes. We include all primary key constraints and foreign key constraints as many as possible here.
+PostgreSQL provides table inheritance. Based on the types and inheritance relationship, four tables are created as Account, Client, Organization and Person. We also create two relationship tables signs and authorizes. We include all primary key constraints and foreign key constraints as many as possible here.
 
 \begin{verbatim}
 CREATE TABLE public."Account"
 OF accounttype
 (
   "number" WITH OPTIONS  NOT NULL,
--- Inherited from type accounttype: "balance",
+-- Inherited from type accounttype: balance,
 -- Inherited from type accounttype: "limit",
-  "owner" WITH OPTIONS  NOT NULL,
-  CONSTRAINT account_pkey PRIMARY KEY (number)
+  owner WITH OPTIONS  NOT NULL,
+  CONSTRAINT account_pkey PRIMARY KEY (number),
+  CONSTRAINT "Account_owner_fkey" FOREIGN KEY (owner)
+      REFERENCES public."Client" (id) MATCH SIMPLE
+      ON UPDATE CASCADE ON DELETE CASCADE
 );
 
-CREATE TABLE public."OrgAccount"
+CREATE TABLE public."Client"
+OF clienttype
 (
--- Inherited from table "Account":  "number" text NOT NULL,
--- Inherited from table "Account":  "balance" numeric,
--- Inherited from table "Account":  "limit" numeric,
--- Inherited from table "Account":  "owner" text NOT NULL,
-  CONSTRAINT "OrgAccount_pkey" PRIMARY KEY (number),
-  CONSTRAINT "OrgAccount_owner_fkey" FOREIGN KEY (owner)
-      REFERENCES public."Organization" (oid) MATCH SIMPLE
-      ON UPDATE CASCADE ON DELETE CASCADE
-)
-INHERITS (public."Account");
-
-CREATE TABLE public."PerAccount"
-(
--- Inherited from table "Account":  "number" text NOT NULL,
--- Inherited from table "Account":  "balance" numeric,
--- Inherited from table "Account":  "limit" numeric,
--- Inherited from table "Account":  "owner" text NOT NULL,
-  CONSTRAINT "PerAccount_pkey" PRIMARY KEY (number),
-  CONSTRAINT "PerAccount_owner_fkey" FOREIGN KEY (owner)
-      REFERENCES public."Person" (pid) MATCH SIMPLE
-      ON UPDATE CASCADE ON DELETE CASCADE
-)
-INHERITS (public."Account");
+  id WITH OPTIONS  NOT NULL,
+-- Inherited from type clienttype: name,
+-- Inherited from type clienttype: address,
+  CONSTRAINT "Client_pkey" PRIMARY KEY (id)
+);
 
 CREATE TABLE public."Organization"
-OF organizationtype
 (
-  oid WITH OPTIONS  NOT NULL,
--- Inherited from type organizationtype: name,
--- Inherited from type organizationtype: address,
-  CONSTRAINT organization_pkey PRIMARY KEY (oid)
-);
+-- Inherited from table "Client":  id text NOT NULL,
+-- Inherited from table "Client":  name text,
+-- Inherited from table "Client":  address text,
+  CONSTRAINT "Organization_pkey" PRIMARY KEY (id)
+)
+INHERITS (public."Client");
 
 CREATE TABLE public."Person"
-OF persontype
 (
-  pid WITH OPTIONS  NOT NULL,
--- Inherited from type persontype: name,
--- Inherited from type persontype: address,
--- Inherited from type persontype: dob,
-  CONSTRAINT person_pkey PRIMARY KEY (pid)
-);
+-- Inherited from table "Client":  id text NOT NULL,
+-- Inherited from table "Client":  name text,
+-- Inherited from table "Client":  address text,
+  dob date,
+  CONSTRAINT "Person_pkey" PRIMARY KEY (id)
+)
+INHERITS (public."Client");
 
 CREATE TABLE public.signs
 (
@@ -542,10 +478,10 @@ CREATE TABLE public.signs
   oid text NOT NULL,
   CONSTRAINT signs_pkey PRIMARY KEY (pid, oid),
   CONSTRAINT signs_oid_fkey FOREIGN KEY (oid)
-      REFERENCES public."Organization" (oid) MATCH SIMPLE
+      REFERENCES public."Organization" (id) MATCH SIMPLE
       ON UPDATE CASCADE ON DELETE CASCADE,
   CONSTRAINT signs_pid_fkey FOREIGN KEY (pid)
-      REFERENCES public."Person" (pid) MATCH SIMPLE
+      REFERENCES public."Person" (id) MATCH SIMPLE
       ON UPDATE CASCADE ON DELETE CASCADE
 );
 
@@ -554,14 +490,19 @@ CREATE TABLE public.authorizes
   cid text NOT NULL,
   pid text NOT NULL,
   CONSTRAINT authorizes_pkey PRIMARY KEY (cid, pid),
+  CONSTRAINT authorizes_cid_fkey FOREIGN KEY (cid)
+      REFERENCES public."Account" ("number") MATCH SIMPLE
+      ON UPDATE CASCADE ON DELETE CASCADE,
   CONSTRAINT authorizes_pid_fkey FOREIGN KEY (pid)
-      REFERENCES public."Person" (pid) MATCH SIMPLE
+      REFERENCES public."Person" (id) MATCH SIMPLE
       ON UPDATE CASCADE ON DELETE CASCADE
 );
 \end{verbatim}
 
 \paragraph{Triggers}
 \par
+TODO: Need to remove the whole paragraph, or rewrite
+\iffalse
 We talked about we need triggers to ensure the constraints pointing to a supertable in section \ref{sec:refinpgsql}. We create two triggers. One executes before insert or update on table authorizes. The other one executes after update or delete on Account. But since the real data is stored in OrgAccount and PerAccount, we should create triggers on OrgAccount and PerAccount.
 
 \begin{verbatim}
@@ -613,48 +554,48 @@ CREATE TRIGGER tf_ud_peraccount
   FOR EACH ROW
   EXECUTE PROCEDURE public.tf_ud_account();
 \end{verbatim}
-
-\paragraph{Functions} PostgreSQL allows function overloading. We create several basic functions to satifsy our need. For the required query, we also create some helper functions. We will talk about that in section \ref{query}.
-
+\fi
+\paragraph{Functions} PostgreSQL allows function overloading. We create several basic functions to satifsy our need. For the required query, we also create some helper functions. We will talk about that in section \ref{sec:qando}.
+\label{sec:functions}
 \begin{verbatim}
-CREATE OR REPLACE FUNCTION public.getAuthUsers("Account")
+CREATE OR REPLACE FUNCTION public."getAuthUsers"("Account")
   RETURNS SETOF "Person" AS
-' SELECT p.* FROM "Person" p, authorizes a WHERE $1.number = a.cid AND a.pid = p.pid '
+' SELECT p.* FROM "Person" p, authorizes a WHERE $1.number = a.cid AND a.pid = p.id '
   LANGUAGE sql;
 
-CREATE OR REPLACE FUNCTION public.getOOwner("Account")
+CREATE OR REPLACE FUNCTION public."getOrgOwner"("Account")
   RETURNS SETOF "Organization" AS
-' SELECT * FROM "Organization" o WHERE o.oid = $1.owner '
+' SELECT * FROM "Organization" o WHERE o.id = $1.owner '
   LANGUAGE sql;
 
-CREATE OR REPLACE FUNCTION public.getPOwner("Account")
+CREATE OR REPLACE FUNCTION public."getPerOwner"("Account")
   RETURNS SETOF "Person" AS
-' SELECT * FROM "Person" p WHERE p.pid = $1.owner '
+' SELECT * FROM "Person" p WHERE p.id = $1.owner '
   LANGUAGE sql;
 
-CREATE OR REPLACE FUNCTION public.getAccounts("Organization")
+CREATE OR REPLACE FUNCTION public."getAccts"("Organization")
   RETURNS SETOF "Account" AS
-' SELECT * FROM "OrgAccount" a WHERE a.owner = $1.oid '
+' SELECT * FROM "Account" a WHERE a.owner = $1.id '
   LANGUAGE sql;
 
-CREATE OR REPLACE FUNCTION public.getAccounts("Person")
+CREATE OR REPLACE FUNCTION public."getAccts"("Person")
   RETURNS SETOF "Account" AS
-' SELECT * FROM "PerAccount" a WHERE a.owner = $1.pid '
+' SELECT * FROM "Account" a WHERE a.owner = $1.id '
   LANGUAGE sql;
 
-CREATE OR REPLACE FUNCTION public.getSigners("Organization")
+CREATE OR REPLACE FUNCTION public."getSigners"("Organization")
   RETURNS SETOF "Person" AS
-' SELECT a.* FROM "Person" a, signs s WHERE $1.oid = s.oid AND a.pid = s.pid '
+' SELECT a.* FROM "Person" a, signs s WHERE $1.id = s.oid AND a.id = s.pid '
   LANGUAGE sql;
 
-CREATE OR REPLACE FUNCTION public.getSignableOrgs("Person")
+CREATE OR REPLACE FUNCTION public."getSignOrgs"("Person")
   RETURNS SETOF "Organization" AS
-' SELECT o.* FROM "Organization" o, signs s WHERE $1.pid = s.pid AND o.oid = s.oid '
+' SELECT o.* FROM "Organization" o, signs s WHERE $1.id = s.pid AND o.id = s.oid '
   LANGUAGE sql;
 
-CREATE OR REPLACE FUNCTION public.getAuthAccounts("Person")
+CREATE OR REPLACE FUNCTION public."getAuthAccts"("Person")
   RETURNS SETOF "Account" AS
-' SELECT a.* FROM "Account" a, authorizes s WHERE $1.pid = s.pid AND s.cid = a.number '
+' SELECT a.* FROM "Account" a, authorizes s WHERE $1.id = s.pid AND s.cid = a.number '
   LANGUAGE sql;
 \end{verbatim}
 
@@ -667,14 +608,14 @@ The queries are the same as Project 1. PostgreSQL has not support universal quan
 \subsection{Query 1}
 Find all pairs of the form (user,signer), where user is an authorized user of an organization's credit card, signer is a person at that organization with signature authority, and the balance on the card is within \$1,000 of the credit limit. For each user/signer, show Id and Name. (TODO: SOMETHING ABOUT AUTHORIZED USER DEFINE HERE)
 
-\paragraph{Supporting functions} We already have all the supporting functions defined. What we need are getAuthUsers(Account), getOOwner(Account) and getSigners(Organization).
+\paragraph{Supporting functions} We already have all the supporting functions defined. What we need are getAuthUsers(Account), getOOwner(Account) and getSigners(Organization) in section \ref{sec:functions}.
 
 \paragraph{Indexes} Nothing here yet
 
 \paragraph{Query SQL statement} Using functions we talked above, we can build our query statement succinctly.
 \begin{verbatim}
-SELECT au.pid, au.name, s.pid, s.name
-FROM "OrgAccount" oa, getAuthUsers(oa) au, getOOwner(oa) oo, getSigners(oo) s
+SELECT au.id, au.name, s.id, s.name
+FROM "Account" oa, "getAuthUsers"(oa) au, "getOrgOwner"(oa) oo, "getSigners"(oo) s
 WHERE oa.balance - oa.limit <= 1000 AND oa.balance - oa.limit >= -1000;
 \end{verbatim}
 
@@ -683,16 +624,16 @@ WHERE oa.balance - oa.limit <= 1000 AND oa.balance - oa.limit >= -1000;
 \subsection{Query 2}
 Find all users (Id, Name) who own four or more cards and are authorized non-owner users for three or more other cards.
 
-\paragraph{Supporting functions} We defined two supporting functions to this query: getAccountNumber(Person) and getAuthAccountNumber(Person).
+\paragraph{Supporting functions} We defined two supporting functions to this query: getAcctNum(Person) and getAuthAcctNum(Person).
 \begin{verbatim}
-CREATE OR REPLACE FUNCTION public.getAccountNumber("Person")
+CREATE OR REPLACE FUNCTION public."getAcctsNum"("Person")
   RETURNS bigint AS
-' SELECT count(*) FROM getAccounts($1)'
+' SELECT count(*) FROM "getAccts"($1)'
   LANGUAGE sql;
 
-CREATE OR REPLACE FUNCTION public.getAuthAccountNumber("Person")
+CREATE OR REPLACE FUNCTION public."getAuthAcctsNum"("Person")
   RETURNS bigint AS
-' SELECT count(*) FROM getAuthAccounts($1) '
+' SELECT count(*) FROM "getAuthAccts"($1) '
   LANGUAGE sql;
 \end{verbatim}
 
@@ -700,9 +641,9 @@ CREATE OR REPLACE FUNCTION public.getAuthAccountNumber("Person")
 
 \paragraph{Query SQL statement}
 \begin{verbatim}
-SELECT p.pid, p.name
+SELECT p.id, p.name
 FROM "Person" p
-WHERE getAccountNumber(p)>=4 AND getAuthAccountNumber(p)>=3;
+WHERE "getAcctsNum"(p)>=4 AND "getAuthAcctsNum"(p)>=3;
 \end{verbatim}
 
 \paragraph{Performance} Nothing here yet
@@ -712,9 +653,9 @@ Find the credit cards (acct. numbers) all of whose signers (i.e., people with si
 
 \paragraph{Supporting functions} We defined one supporting function getMaxLimit(Person) to this query.
 \begin{verbatim}
-CREATE OR REPLACE FUNCTION public.getMaxLimit("Person")
+CREATE OR REPLACE FUNCTION public."getMaxLimit"("Person")
   RETURNS numeric AS
-' SELECT max(a.limit) FROM getAccounts($1) a '
+' SELECT max(a.limit) FROM "getAccts"($1) a '
   LANGUAGE sql;
 \end{verbatim}
 
@@ -723,8 +664,8 @@ CREATE OR REPLACE FUNCTION public.getMaxLimit("Person")
 \paragraph{Query SQL statement} Since PostgreSQL does not support universal quantification, we have to use double-negation to create equivalent query. We convert ``for all ... at least'' to ``not exist ... less than''.
 \begin{verbatim}
 SELECT DISTINCT a.number
-FROM "Account" a, getOOwner(a) oo, getSigners(oo) s
-WHERE NOT getMaxLimit(s) < 25000;
+FROM "Account" a, "getOrgOwner"(a) oo, "getSigners"(oo) s
+WHERE NOT "getMaxLimit"(s) < 25000;
 \end{verbatim}
 
 \paragraph{Performance} Nothing here yet
@@ -734,13 +675,17 @@ Find all pairs (U,C) where U is an indirect user of the credit card C. (For each
 
 \paragraph{Supporting functions} We need to define a new function that returns proper authorized users. Basically it is getAuthUsers function plus getSigners if the card owner is an organization.
 \begin{verbatim}
-CREATE OR REPLACE FUNCTION public.getNonOwnerAuthUsers("Account")
+CREATE OR REPLACE FUNCTION public."getNonOwnerAuthUsers"("Account")
   RETURNS SETOF "Person" AS
 $BODY$
-  SELECT p.* FROM "Person" p, authorizes a WHERE $1.number = a.cid AND a.pid = p.pid
+  SELECT p.*
+  FROM "Person" p, authorizes a
+  WHERE $1.number = a.cid AND a.pid = p.id
   UNION
   -- union signer if owner is an organization
-  SELECT p.* FROM "Person" p, signs s WHERE $1.owner = s.oid AND s.pid = p.pid
+  SELECT p.*
+  FROM "Person" p, signs s
+  WHERE $1.owner = s.oid AND s.pid = p.id
 $BODY$
   LANGUAGE sql;
 \end{verbatim}
@@ -749,13 +694,13 @@ $BODY$
 
 \paragraph{Query SQL statement} WITH statement (CTE) is used in this query to do recursive query.
 \begin{verbatim}
-WITH RECURSIVE indirect_user(pid, name, number) AS (
-    SELECT aa.pid, aa.name, a.number
-    FROM "Account" a, getNonOwnerAuthUsers(a) aa
+WITH RECURSIVE indirect_user(id, name, number) AS (
+    SELECT aa.id, aa.name, a.number
+    FROM "Account" a, "getNonOwnerAuthUsers"(a) aa
   UNION
-    SELECT aa.pid, aa.name, iu.number
-    FROM indirect_user iu, "Person" p, "Account" a, getNonOwnerAuthUsers(a) aa
-    WHERE iu.pid = p.pid AND a.owner = p.pid
+    SELECT aa.id, aa.name, iu.number
+    FROM indirect_user iu, "Person" p, "Account" a, "getNonOwnerAuthUsers"(a) aa
+    WHERE iu.id = p.id AND a.owner = p.id
 )
 SELECT *
 FROM indirect_user;
@@ -772,13 +717,13 @@ Find the total of all balances for the credit cards that have Joe as one of the 
 
 \paragraph{Query SQL statement} WITH statement (CTE) is used in this query to do recursive query.
 \begin{verbatim}
-WITH RECURSIVE indirect_user(pid, name, number) AS (
-    SELECT aa.pid, aa.name, a.number
-    FROM "Account" a, getNonOwnerAuthUsers(a) aa
+WITH RECURSIVE indirect_user(id, name, number) AS (
+    SELECT aa.id, aa.name, a.number
+    FROM "Account" a, "getNonOwnerAuthUsers"(a) aa
   UNION
-    SELECT aa.pid, aa.name, iu.number
-    FROM indirect_user iu, "Person" p, "Account" a, getNonOwnerAuthUsers(a) aa
-    WHERE iu.pid = p.pid AND a.owner = p.pid
+    SELECT aa.id, aa.name, iu.number
+    FROM indirect_user iu, "Person" p, "Account" a, "getNonOwnerAuthUsers"(a) aa
+    WHERE iu.id = p.id AND a.owner = p.id
 )
 SELECT sum(a.balance)
 FROM indirect_user iu, "Account" a
