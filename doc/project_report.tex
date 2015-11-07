@@ -1,7 +1,7 @@
 % @Author: Yinlong Su
 % @Date:   2015-10-30 16:15:47
 % @Last Modified by:   Yinlong Su
-% @Last Modified time: 2015-11-06 17:13:59
+% @Last Modified time: 2015-11-06 19:42:19
 
 \documentclass[11pt]{article}
 \usepackage{pgf-umlcd}
@@ -312,11 +312,7 @@ The tuples were not identical because they came from different tables and they h
 \end{verbatim}
 
 \par
-In fact, that is not the only problem that inheritance of PostgreSQL rises. When we create a foreign key that points to a supertable, we will encounter exception saying that foreign key does not exist. It is because the supertable is usually empty and PostgreSQL does not extract data from subtables when handle foreign key constraints. This type of behavior has been described in the document:
-\par
-\emph{All check constraints and not-null constraints on a parent table are automatically inherited by its children. Other types of constraints (unique, primary key, and foreign key constraints) are not inherited.}
-\par
-As a result, we need to handle the foreign key constraints which point to a supertable very carefully. The best way is to avoid using that. But we can also create some triggers to ensure the data consistency. Based on the complexity of implementation and the performance on PostgreSQL, we decided not to partition the Person type.
+The partition is not disjoint thus brings redundancy. We do not split the Person table in our design.
 
 \subsubsection{References in PostgreSQL}
 \label{sec:refinpgsql}
@@ -325,9 +321,15 @@ In SQL 1999/2003 object extensions, we can use object references to access relat
 \par
 Using OIDs in our tables does not simplify the query in our system. No function or call is provided to convert OID to object. If we want to get the object the OID represents, we have to do join query. Basically, it has nothing different from using our own foreign keys.
 \par
+When we create a foreign key that points to a supertable, we will encounter exception saying that foreign key does not exist. It is because the supertable is usually empty and PostgreSQL does not extract data from subtables when handle foreign key constraints. This type of behavior has been described in the document:
+\par
+\emph{All check constraints and not-null constraints on a parent table are automatically inherited by its children. Other types of constraints (unique, primary key, and foreign key constraints) are not inherited.}
+\par
+As a result, we need to handle the foreign key constraints which point to a supertable very carefully. We can create some triggers to ensure the data consistency. Or we can insert duplicate tuples to both supertable and subtable. In our design, we have a foreign key pointing to supertable Client from table Account. We keep a same copy of every tuple of subtables Organization and Person in supertable Client.
+\par
 In addition, PostgreSQL does not support array element foreign key referencing. In our original object-relational design, we have some array attributes in our classes. PostgreSQL can not define foreign key references on array. At first we want to use CHECK constraint, but those CHECK constraints in PostgreSQL does not support nested query.
 \par
-So we have to use triggers to ensure the references if we want to use arrays in our tables. Or we can use extra relationship tables and foreign keys in an old way. It is ARRAY + TRIGGERS vs TABLE + FOREIGN KEY. We choose the latter in our final design and we have two reasons:
+So we have to use triggers to ensure the references if we want to use arrays in our tables. Or we can use extra relationship tables and foreign keys in an old way. It is ARRAY + TRIGGERS vs TABLE + FOREIGN KEY. We choose the latter in our final design and we have three reasons:
 \par
 \begin{enumerate}
 \item Using so many triggers is inefficient. For every many-to-many relationship, if we use arrays, we have to create triggers on every foreign key constraint. The triggers are for the action taken after update and delete. If we want to ensure participation constraints, we have to create triggers before insert. We do not want to write so many triggers. Using build-in foreign key constraints of PostgreSQL is fine with us.
@@ -336,14 +338,12 @@ So we have to use triggers to ensure the references if we want to use arrays in 
 \end{enumerate}
 \par
 So we decide to use extra relationship tables and foreign key references to store all many-to-many relationships. We also have some methods under the schema to provide us some object-oriented features to simplify our query.
-\par
-There is another problem that our authorizes table needs to refer to Account table. We know that Account table actually has no tuples (we talked about this in section \ref{sec:ptype}). We need to create triggers for this particular foreign key constraint.
 
 \subsubsection{CCDB Database on PostgreSQL}
 \par
 PostgreSQL has some object-relational database features. But many of them are different from what we think about. In this section we cretae our CCDB system on PostgreSQL. Before we go into details, we create a new UML class diagram for CCDB under PostgreSQL, as shown in Figure \ref{fig:newumlccdb}.
 \par
-We remove the package Account, and move owner attribute from OrgAccount and PerAccount to interface Account. The real foreign constraints will define in class OrgAccount and PerAccount. Also, we omit all 0..* labels on association lines. Finally, all functions are grouped in a yellow box, which indicates the schema function library.
+We remove the package Clients. Also, we omit all 0..* labels on association lines. Finally, all functions are grouped in a yellow box, which indicates the schema function library.
 
 \begin{figure}[!htp]
 \centering
@@ -501,60 +501,76 @@ CREATE TABLE public.authorizes
 
 \paragraph{Triggers}
 \par
-TODO: Need to remove the whole paragraph, or rewrite
-\iffalse
-We talked about we need triggers to ensure the constraints pointing to a supertable in section \ref{sec:refinpgsql}. We create two triggers. One executes before insert or update on table authorizes. The other one executes after update or delete on Account. But since the real data is stored in OrgAccount and PerAccount, we should create triggers on OrgAccount and PerAccount.
+We talked about we need triggers to ensure the constraints pointing to a supertable in section \ref{sec:refinpgsql}. Basically, we need to make supertable always has the tuples of its subtables. So we create triggers on Organization and Person. When the modify is done, do the same thing with supertable Client.
 
 \begin{verbatim}
-CREATE OR REPLACE FUNCTION public.tf_iu_authorizes()
+CREATE OR REPLACE FUNCTION public.tf_i_client()
   RETURNS trigger AS
 $BODY$
   BEGIN
-    -- Check the insert/update row has correct account number in text array owns
-    IF (NEW.cid IN (SELECT pa.number FROM "PerAccount" pa)) OR (NEW.cid IN (SELECT oa.number FROM "OrgAccount" oa)) THEN
-      RETURN NEW;
-    END IF;
-    RAISE EXCEPTION '% is not a valid account number.', NEW.cid;
+    INSERT INTO "Client" SELECT NEW.id, NEW.name, NEW.address;
+    RETURN NEW;
   END;
 $BODY$
   LANGUAGE plpgsql;
 
-CREATE TRIGGER tf_iu_authorizes
-  BEFORE INSERT OR UPDATE
-  ON public.authorizes
+CREATE TRIGGER tf_i_organization
+  AFTER INSERT
+  ON public."Organization"
   FOR EACH ROW
-  EXECUTE PROCEDURE public.tf_iu_authorizes();
+  EXECUTE PROCEDURE public.tf_i_client();
 
-CREATE OR REPLACE FUNCTION public.tf_ud_account()
+ CREATE TRIGGER tf_i_person
+  AFTER INSERT
+  ON public."Person"
+  FOR EACH ROW
+  EXECUTE PROCEDURE public.tf_i_client();
+
+CREATE OR REPLACE FUNCTION public.tf_u_client()
   RETURNS trigger AS
 $BODY$
   BEGIN
-    -- Check the insert/update row has correct account number in text array owns
-    IF (TG_OP = 'DELETE') THEN
-      DELETE from authorizes WHERE cid = OLD.number;
-      RETURN OLD;
-    ELSEIF (NOT NEW.number = OLD.number) THEN
-      UPDATE authorizes SET cid = NEW.number WHERE cid = OLD.number;
-      RETURN NEW;
-    END IF;
-    RETURN NULL; -- result is ignored since this is an AFTER trigger
+    UPDATE ONLY "Client" SET id=NEW.id, name=NEW.name, address=NEW.address WHERE id=OLD.id;
+    RETURN NEW;
   END;
 $BODY$
   LANGUAGE plpgsql;
 
-CREATE TRIGGER tf_ud_orgaccount
-  AFTER UPDATE OR DELETE
-  ON public."OrgAccount"
+CREATE TRIGGER tf_u_organization
+  AFTER UPDATE
+  ON public."Organization"
   FOR EACH ROW
-  EXECUTE PROCEDURE public.tf_ud_account();
+  EXECUTE PROCEDURE public.tf_u_client();
 
-CREATE TRIGGER tf_ud_peraccount
-  AFTER UPDATE OR DELETE
-  ON public."PerAccount"
+ CREATE TRIGGER tf_u_person
+  AFTER UPDATE
+  ON public."Person"
   FOR EACH ROW
-  EXECUTE PROCEDURE public.tf_ud_account();
+  EXECUTE PROCEDURE public.tf_u_client();
+
+CREATE OR REPLACE FUNCTION public.tf_d_client()
+  RETURNS trigger AS
+$BODY$
+  BEGIN
+    DELETE FROM "Client" WHERE id=OLD.id;
+    RETURN NEW;
+  END;
+$BODY$
+  LANGUAGE plpgsql;
+
+CREATE TRIGGER tf_d_organization
+  AFTER DELETE
+  ON public."Organization"
+  FOR EACH ROW
+  EXECUTE PROCEDURE public.tf_d_client();
+
+ CREATE TRIGGER tf_d_person
+  AFTER DELETE
+  ON public."Person"
+  FOR EACH ROW
+  EXECUTE PROCEDURE public.tf_d_client();
 \end{verbatim}
-\fi
+
 \paragraph{Functions} PostgreSQL allows function overloading. We create several basic functions to satifsy our need. For the required query, we also create some helper functions. We will talk about that in section \ref{sec:qando}.
 \label{sec:functions}
 \begin{verbatim}
@@ -606,7 +622,9 @@ CREATE OR REPLACE FUNCTION public."getAuthAccts"("Person")
 The queries are the same as Project 1. PostgreSQL has not support universal quantification, so we convert query 3 into double-negation form. As for query 4 and 5, we created recursive queries using common table expressions.
 
 \subsection{Query 1}
-Find all pairs of the form (user,signer), where user is an authorized user of an organization's credit card, signer is a person at that organization with signature authority, and the balance on the card is within \$1,000 of the credit limit. For each user/signer, show Id and Name. (TODO: SOMETHING ABOUT AUTHORIZED USER DEFINE HERE)
+Find all pairs of the form (user,signer), where user is an authorized user of an organization's credit card, signer is a person at that organization with signature authority, and the balance on the card is within \$1,000 of the credit limit. For each user/signer, show Id and Name.
+\par
+In this query, we treat ``authorized user'' as non-owner-and-signer authorized user to fit the test data sample output.
 
 \paragraph{Supporting functions} We already have all the supporting functions defined. What we need are getAuthUsers(Account), getOOwner(Account) and getSigners(Organization) in section \ref{sec:functions}.
 
