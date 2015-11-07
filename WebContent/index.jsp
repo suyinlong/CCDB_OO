@@ -8,7 +8,7 @@
     <body>
     <center>
         <div id="mystyle" style="border: none;">
-                <a href="Query1.jsp">View Account</a>
+                <a href="Query1.jsp">Home</a>
             </p>
         </div>
     </center>

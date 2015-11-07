@@ -26,13 +26,8 @@ public class GetAccountServlet extends HttpServlet {
 
 
 		String query = request.getParameter("Query");
-		System.out.println(query);
 		String sql;
-		
-		if( query.equals("q1") );
-		{
-			sql = Configuration.QUERY[0];
-		}
+		sql = Configuration.QUERY[Integer.parseInt(query)-1];
 		
 		
 		try {
@@ -55,17 +50,18 @@ public class GetAccountServlet extends HttpServlet {
 			PrintWriter out = response.getWriter();
 			
 			// Print the query
-			out.println( "<b>SQL Query</b>: " + sql );
+			// TODO: Try to use English to print the sql query.
+			//out.println( "<b>SQL Query</b>: " + sql );
+			
 			out.println( "<b>Result</b>" );
-
-			out.println( "<table>" );
+			out.println( "<table border='1'>" );
 			
 			// Print attributes
 			out.println( "<thead> <TR>" );
 			for( int i = 1; i <= columnCnt; ++i )
 			{
 				String label = rs.getMetaData().getColumnLabel( i );
-                out.println( "<TD>"+ label +"</TD>" );
+                out.println( "<TD><b>"+ label +"</b></TD>" );
 			}
 			out.println( "</thead> </TR>" );
 			
@@ -104,9 +100,10 @@ public class GetAccountServlet extends HttpServlet {
                     "<head> \n" +
                       "<meta http-equiv=\"Content-Type\" content=\"text/html; " +
                         "charset=ISO-8859-1\"> \n" +
-                      "<title> Crunchify.com JSP Servlet Example  </title> \n" +
+                      "<title> Query Results  </title> \n" +
                     "</head> \n" +
-                    "<body> \n"
+                    "<body> \n" +
+                    "<center><a href='Query1.jsp'>Home</a> </center><br><br>"
                 );
 	}
 
