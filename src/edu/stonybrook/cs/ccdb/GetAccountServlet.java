@@ -51,10 +51,8 @@ public class GetAccountServlet extends HttpServlet {
 			
 			// Print the query
 			// TODO: Try to use English to print the sql query.
-			//out.println( "<b>SQL Query</b>: " + sql );
 			
-			out.println( "<b>Result</b>" );
-			out.println( "<table border='1'>" );
+			out.println( "<table>" );
 			
 			// Print attributes
 			out.println( "<thead> <TR>" );
@@ -100,10 +98,10 @@ public class GetAccountServlet extends HttpServlet {
                     "<head> \n" +
                       "<meta http-equiv=\"Content-Type\" content=\"text/html; " +
                         "charset=ISO-8859-1\"> \n" +
+                      "<link rel=\"stylesheet\" href=\"style.css\" type=\"text/css\" media=\"screen\" />" +
                       "<title> Query Results  </title> \n" +
                     "</head> \n" +
-                    "<body> \n" +
-                    "<center><a href='Query1.jsp'>Home</a> </center><br><br>"
+                    "<body> \n"
                 );
 	}
 

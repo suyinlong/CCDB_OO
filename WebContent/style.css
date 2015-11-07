@@ -1,0 +1,89 @@
+* {
+    margin: 0;
+    padding: 0;
+}
+body {
+    background: #ffffff;
+    font-size: 12px;
+    font-family: Verdana, Arial, Sans-Serif;
+    color: #000000;
+    padding: 0px;
+    margin: 0px;
+}
+
+table { border-style: solid; border-width: 1px; border-radius: 3px; margin: 10px;}
+td { padding: 5px;}
+
+img { padding: 0px; margin: 0px; border: none;}
+hr { border-left:0px solid #abb0b5; border-right:0px solid #abb0b5; border-top:1px dotted #abb0b5; border-bottom:0px solid #abb0b5; height : 1px;  }
+
+form { padding: 0px; margin-left: 24px; margin-top:24px;}
+input { font-family: 'Verdana'; color: #282b31; font-size: 11px; margin-top: 3px; margin-right: 3px;}
+
+h1, h2, h3, h4, h5 { color: #333; font-family: Georgia, 'Times New Roman', Times, serif; font-size: 24.7px; }
+
+.wrapper {
+    background: #f7f7f7;
+    height: 62px;
+    border-bottom: 1px solid #dfdfdf;
+    text-align: center;
+}
+.wrapper h1 {
+    color: #555;
+    font-family: sans-serif;
+    font-size: 28px;
+    line-height: 62px;
+}
+.wrapper a:link { text-decoration: none; color: #21759b; font-family: sans-serif; font-size: 20px; border: 0px; -moz-outline-style: none;}
+.wrapper a:active { text-decoration: underline; color : #63dbf5; border: 0px; -moz-outline-style: none; font-size: 20px;}
+.wrapper a:visited { text-decoration: none; color : #4ca6cf; border: 0px; -moz-outline-style: none; font-size: 20px;}
+.wrapper a:hover { text-decoration: underline; color : #d55321; border: 0px; -moz-outline-style: none; font-size: 20px;}
+.wrapper a:focus { outline: none;-moz-outline-style: none;}
+
+.content {
+    clear: both;
+    max-width: 960px;
+    height: 300px;
+    margin: 10px auto;
+}
+
+.query {
+    display: block;
+    float: left;
+    width: 130px;
+    margin: 0 14px;
+    text-align: center;border-right:1px solid #dfdfdf;
+}
+
+.submenu {
+    text-align: center;
+    list-style: none;
+    margin: 20px 10px;
+}
+
+.submenu li {
+    border-bottom: 1px solid #dedede;
+    font-size: 12px;
+    line-height: 18px;
+    padding: 5px 0;
+}
+
+.submenu a:link { text-decoration: none; color: #21759b; font-family: sans-serif; font-size: 12px; border: 0px; -moz-outline-style: none;}
+.submenu a:active { text-decoration: underline; color : #63dbf5; border: 0px; -moz-outline-style: none; font-size: 12px;}
+.submenu a:visited { text-decoration: none; color : #4ca6cf; border: 0px; -moz-outline-style: none; font-size: 12px;}
+.submenu a:hover { text-decoration: underline; color : #d55321; border: 0px; -moz-outline-style: none; font-size: 12px;}
+.submenu a:focus { outline: none;-moz-outline-style: none;}
+
+.result {
+    display: block;
+    float: left;
+    width: 772px;
+    margin: 0 14px;
+}
+
+.result iframe {
+    border: 0;
+    width: 700px;
+    height: 1000px;
+    overflow-y: visible;
+}
