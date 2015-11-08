@@ -44,13 +44,11 @@ public class GetAccountServlet extends HttpServlet {
 			stmt = conn.createStatement(ResultSet.TYPE_SCROLL_SENSITIVE, ResultSet.CONCUR_UPDATABLE);
 			rs = stmt.executeQuery(sql);
 			
-			PrintHTMLCommonBegin( request, response );
 			
 			int columnCnt = rs.getMetaData().getColumnCount();
 			PrintWriter out = response.getWriter();
 			
-			// Print the query
-			// TODO: Try to use English to print the sql query.
+			PrintHTMLCommonBegin( out );
 			
 			out.println( "<table>" );
 			
@@ -76,7 +74,7 @@ public class GetAccountServlet extends HttpServlet {
 
 			out.println( "</table>" );
 			
-			PrintHTMLCommonEnd( request, response );
+			PrintHTMLCommonEnd( out );
 		        
 			rs.close();
 			stmt.close();
@@ -87,10 +85,9 @@ public class GetAccountServlet extends HttpServlet {
 		}
 	}
 	
-	private void PrintHTMLCommonBegin( HttpServletRequest request, HttpServletResponse response )
+	private void PrintHTMLCommonBegin( PrintWriter out )
 					throws IOException
 	{
-		PrintWriter out = response.getWriter();
         out.println (
                   "<!DOCTYPE html PUBLIC \"-//W3C//DTD HTML 4.01 Transitional//EN\" +" +
                       "http://www.w3.org/TR/html4/loose.dtd\">\n" +
@@ -105,10 +102,9 @@ public class GetAccountServlet extends HttpServlet {
                 );
 	}
 
-	private void PrintHTMLCommonEnd( HttpServletRequest request, HttpServletResponse response )
+	private void PrintHTMLCommonEnd( PrintWriter out )
 					throws IOException
 	{
-		PrintWriter out = response.getWriter();
 	    out.println (
 	              "</body> \n" +
 	              "</html>" 
