@@ -9,7 +9,7 @@
         <title>CSE 532 Project 2 Home Page</title>
         <script language="JavaScript">
         	function query(id) {
-        		resulttable.innerHTML = "<iframe src=\"GetAccountServlet?Query=" + id + "\" scrolling=\"no\"></iframe>";
+        		resulttable.innerHTML = "<iframe src=\"QueryProcessingServlet?Query=" + id + "\" scrolling=\"no\"></iframe>";
         	}
         </script>
     </head>

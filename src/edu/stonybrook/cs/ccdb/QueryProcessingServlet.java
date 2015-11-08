@@ -11,10 +11,10 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.sql.ResultSet;
 /**
- * Servlet implementation class GetAccountServlet
+ * Servlet implementation class QueryProcessingServlet
  */
-@WebServlet(name="GetAccountServlet", urlPatterns={"/GetAccountServlet"})
-public class GetAccountServlet extends HttpServlet {
+@WebServlet(name="QueryProcessingServlet", urlPatterns={"/QueryProcessingServlet"})
+public class QueryProcessingServlet extends HttpServlet {
 	private static final long serialVersionUID = 1L;
 	/**
 	 * @see HttpServlet#doGet(HttpServletRequest request, HttpServletResponse response)
