@@ -677,7 +677,18 @@ CREATE OR REPLACE FUNCTION public."getMaxLimit"("Person")
   LANGUAGE sql;
 \end{verbatim}
 
-\paragraph{Indexes} Nothing here yet
+\paragraph{Indexes}
+\begin{verbatim}
+CREATE INDEX organization_id_index
+  ON "Organization"
+  USING btree
+  (id COLLATE pg_catalog."default");
+
+CREATE INDEX person_id_key
+  ON "Person"
+  USING btree
+  (id COLLATE pg_catalog."default");
+\end{verbatim}
 
 \paragraph{Query SQL statement} Since PostgreSQL does not support universal quantification, we have to use double-negation to create equivalent query. We convert ``for all ... at least'' to ``not exist ... less than''.
 \begin{verbatim}
