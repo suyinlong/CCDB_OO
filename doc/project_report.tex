@@ -1,7 +1,7 @@
 % @Author: Yinlong Su
 % @Date:   2015-10-30 16:15:47
 % @Last Modified by:   Yinlong Su
-% @Last Modified time: 2015-11-06 19:42:19
+% @Last Modified time: 2015-11-09 12:21:13
 
 \documentclass[11pt]{article}
 \usepackage{pgf-umlcd}
@@ -10,6 +10,7 @@
 \usepackage{graphicx}
 \usepackage{listings}
 \usepackage{hyperref}
+\usepackage{multirow}
 \usepackage[all]{hypcap}
 \usepackage{tikz-er2}
 \usetikzlibrary{shadows,positioning}
@@ -615,11 +616,25 @@ CREATE OR REPLACE FUNCTION public."getAuthAccts"("Person")
   LANGUAGE sql;
 \end{verbatim}
 
-\paragraph{Indexes} Query Optimizer can take advantage of indexes to produce better execution plans. We want to speed up our queries and improve the performance of our Web applications. Although we can create indexes for every column used in our queries, PostgreSQL would waste space and time to determine which indexes to use. Meanwhile, extra cost will be added into operations like inserts, updates and deletes since indexes need to be updated. The indexes we created will be described in section \ref{sec:qando} along with queries.
+\paragraph{Indexes} Query Optimizer can take advantage of indexes to produce better execution plans. We want to speed up our queries and improve the performance of our Web applications. Although we can create indexes for every column used in our queries, PostgreSQL would waste space and time to determine which indexes to use. Meanwhile, extra cost will be added into operations like inserts, updates and deletes since indexes need to be updated.
+\par
+To optimize the functions and the queries, we created 7 indexes in our database. We created an index on owner attribute of Account table since it is frequently used to join with Client, Organization and Person tables. We also considered to create an index on number attribute of Account table, but the effect was very limited and caused addition time on query 2. The id attributes of Organization and Person tables are also indexed. And finally, all attributes of authorizes and signs are indexed.
+
+\begin{verbatim}
+CREATE INDEX account_owner ON "Account" USING btree (owner);
+CREATE INDEX organization_id ON "Organization" USING btree (id);
+CREATE INDEX person_id ON "Person" USING btree (id);
+CREATE INDEX signs_pid ON "signs" USING btree (pid);
+CREATE INDEX signs_oid ON "signs" USING btree (oid);
+CREATE INDEX authorizes_cid ON "authorizes" USING btree (cid);
+CREATE INDEX authorizes_pid ON "authorizes" USING btree (pid);
+\end{verbatim}
 
 \section{Queries and Optimizations}
 \label{sec:qando}
 The queries are the same as Project 1. PostgreSQL has not support universal quantification, so we convert query 3 into double-negation form. As for query 4 and 5, we created recursive queries using common table expressions.
+\par
+To test the effect of optimization, we inserted 100,000 random tuples into Account, Organization and Person tables resepectively. Table authorizes and signs are also inserted 10,000 random tuples separately.
 
 \subsection{Query 1}
 Find all pairs of the form (user,signer), where user is an authorized user of an organization's credit card, signer is a person at that organization with signature authority, and the balance on the card is within \$1,000 of the credit limit. For each user/signer, show Id and Name.
@@ -628,8 +643,6 @@ In this query, we treat ``authorized user'' as non-owner-and-signer authorized u
 
 \paragraph{Supporting functions} We already have all the supporting functions defined. What we need are getAuthUsers(Account), getOOwner(Account) and getSigners(Organization) in section \ref{sec:functions}.
 
-\paragraph{Indexes} Nothing here yet
-
 \paragraph{Query SQL statement} Using functions we talked above, we can build our query statement succinctly.
 \begin{verbatim}
 SELECT au.id, au.name, s.id, s.name
@@ -637,7 +650,31 @@ FROM "Account" oa, "getAuthUsers"(oa) au, "getOrgOwner"(oa) oo, "getSigners"(oo)
 WHERE oa.balance - oa.limit <= 1000 AND oa.balance - oa.limit >= -1000;
 \end{verbatim}
 
-\paragraph{Performance} Nothing here yet
+\paragraph{Optimization} Table \ref{tab:q1} shows the join fields of Query 1.
+
+\begin{table}[!htbp]
+\centering
+\label{tab:q1}
+\caption{Join table of Query 1}
+\begin{tabular}{|l||r|c|l|c|}
+\hline
+{\itshape Function} & \multicolumn{4}{c|}{\itshape Join} \\
+\hline
+\multirow{2}{*}{getAuthUsers} & 1 & Account.number & - & authorizes.cid \\
+\cline{2-5}
+& 2 & authorizeds.pid & - & Person.id \\
+\hline
+getOrgOwner & 3 & Account.owner & - & Organization.id \\
+\hline
+\multirow{2}{*}{getSigners} & 4 & Organization.id & - & signs.oid \\
+\cline{2-5}
+& 5 & signs.pid & - & Person.id \\
+\hline
+\end{tabular}
+\end{table}
+
+\par
+Although there are 5 joins in Query 1, the optimization effect of indexes is not obvious. This may be we haven't insert enough data into tables. Or the where clause of Query 1 reduces many tuples at the beginning. The query runtimes before and after optimization are all 1.3 seconds.
 
 \subsection{Query 2}
 Find all users (Id, Name) who own four or more cards and are authorized non-owner users for three or more other cards.
@@ -655,8 +692,6 @@ CREATE OR REPLACE FUNCTION public."getAuthAcctsNum"("Person")
   LANGUAGE sql;
 \end{verbatim}
 
-\paragraph{Indexes} Nothing here yet
-
 \paragraph{Query SQL statement}
 \begin{verbatim}
 SELECT p.id, p.name
@@ -664,7 +699,27 @@ FROM "Person" p
 WHERE "getAcctsNum"(p)>=4 AND "getAuthAcctsNum"(p)>=3;
 \end{verbatim}
 
-\paragraph{Performance} Nothing here yet
+\paragraph{Optimization} Table \ref{tab:q2} shows the join fields of Query 2.
+
+\begin{table}[!htbp]
+\centering
+\label{tab:q2}
+\caption{Join table of Query 2}
+\begin{tabular}{|l||r|c|l|c|}
+\hline
+{\itshape Function} & \multicolumn{4}{c|}{\itshape Join} \\
+\hline
+getAcctsNum & 1 & Person.id & - & Account.owner \\
+\hline
+\multirow{2}{*}{getAuthAcctsNum} & 2 & Person.id & - & authorizes.pid \\
+\cline{2-5}
+& 3 & authorizes.cid & - & Account.number \\
+\hline
+\end{tabular}
+\end{table}
+
+\par
+The optimization effect in Query 2 is very significant. The runtime before optimization is 18 minutes 47 seconds while 5.6 seconds is the runtime after optimization.
 
 \subsection{Query 3}
 Find the credit cards (acct. numbers) all of whose signers (i.e., people with signature authority of the organizations that own those cards) also own personal credit cards with credit limits at least \$25,000.
@@ -697,7 +752,29 @@ FROM "Account" a, "getOrgOwner"(a) oo, "getSigners"(oo) s
 WHERE NOT "getMaxLimit"(s) < 25000;
 \end{verbatim}
 
-\paragraph{Performance} Nothing here yet
+\paragraph{Optimization} Table \ref{tab:q3} shows the join fields of Query 3.
+
+\begin{table}[!htbp]
+\centering
+\label{tab:q3}
+\caption{Join table of Query 3}
+\begin{tabular}{|l||r|c|l|c|}
+\hline
+{\itshape Function} & \multicolumn{4}{c|}{\itshape Join} \\
+\hline
+getOrgOwner & 1 & Account.owner & - & Organization.id \\
+\hline
+\multirow{2}{*}{getSigners} & 2 & Organization.id & - & signs.oid \\
+\cline{2-5}
+& 3 & signs.pid & - & Person.id \\
+\hline
+getMaxLimit & 4 & Account.owner & - & Person.id \\
+\hline
+\end{tabular}
+\end{table}
+
+\par
+The optimization effect in Query 3 is not obvious. The runtime before optimization is 1012 milliseconds while 845 milliseconds is the runtime after optimization.
 
 \subsection{Query 4}
 Find all pairs (U,C) where U is an indirect user of the credit card C. (For each user, show Id and Name. For credit cards, show the account number.)
@@ -719,8 +796,6 @@ $BODY$
   LANGUAGE sql;
 \end{verbatim}
 
-\paragraph{Indexes} Nothing here yet
-
 \paragraph{Query SQL statement} WITH statement (CTE) is used in this query to do recursive query.
 \begin{verbatim}
 WITH RECURSIVE indirect_user(id, name, number) AS (
@@ -728,22 +803,44 @@ WITH RECURSIVE indirect_user(id, name, number) AS (
     FROM "Account" a, "getNonOwnerAuthUsers"(a) aa
   UNION
     SELECT aa.id, aa.name, iu.number
-    FROM indirect_user iu, "Person" p, "Account" a, "getNonOwnerAuthUsers"(a) aa
-    WHERE iu.id = p.id AND a.owner = p.id
+    FROM indirect_user iu, "Account" a, "getNonOwnerAuthUsers"(a) aa
+    WHERE iu.id = a.owner
 )
 SELECT *
 FROM indirect_user;
 \end{verbatim}
 
-\paragraph{Performance} Nothing here yet
+\paragraph{Optimization} Table \ref{tab:q4} shows the join fields of Query 4.
+
+\begin{table}[!htbp]
+\centering
+\label{tab:q4}
+\caption{Join table of Query 4}
+\begin{tabular}{|l||r|c|l|c|}
+\hline
+{\itshape Function} & \multicolumn{4}{c|}{\itshape Join} \\
+\hline
+\multirow{4}{*}{getNonOwnerAuthUsers} & 1 & Account.number & - & authorizes.cid \\
+\cline{2-5}
+& 2 & authorizes.pid & - & Person.id \\
+\cline{2-5}
+& 3 & Account.owner & - & signs.oid \\
+\cline{2-5}
+& 4 & signs.pid & - & Person.id \\
+\hline
+indirectUser & 5 & indirectUser.id & - & Account.owner \\
+\hline
+\end{tabular}
+\end{table}
+
+\par
+The optimization effect in Query 4 is obvious. The runtime before optimization is 8 minutes and 4 seconds while 10.4 seconds is the runtime after optimization.
 
 \subsection{Query 5}
 Find the total of all balances for the credit cards that have Joe as one of the indirect users.
 
 \paragraph{Supporting functions} Same as Query 4.
 
-\paragraph{Indexes} Nothing here yet
-
 \paragraph{Query SQL statement} WITH statement (CTE) is used in this query to do recursive query.
 \begin{verbatim}
 WITH RECURSIVE indirect_user(id, name, number) AS (
@@ -751,15 +848,41 @@ WITH RECURSIVE indirect_user(id, name, number) AS (
     FROM "Account" a, "getNonOwnerAuthUsers"(a) aa
   UNION
     SELECT aa.id, aa.name, iu.number
-    FROM indirect_user iu, "Person" p, "Account" a, "getNonOwnerAuthUsers"(a) aa
-    WHERE iu.id = p.id AND a.owner = p.id
+    FROM indirect_user iu, "Account" a, "getNonOwnerAuthUsers"(a) aa
+    WHERE iu.id = a.owner
 )
 SELECT sum(a.balance)
 FROM indirect_user iu, "Account" a
 WHERE iu.name = 'Joe' AND iu.number = a.number;
 \end{verbatim}
 
-\paragraph{Performance} Nothing here yet
+\paragraph{Optimization} Table \ref{tab:q5} shows the join fields of Query 5.
+
+\begin{table}[!htbp]
+\centering
+\label{tab:q5}
+\caption{Join table of Query 5}
+\begin{tabular}{|l||r|c|l|c|}
+\hline
+{\itshape Function} & \multicolumn{4}{c|}{\itshape Join} \\
+\hline
+\multirow{4}{*}{getNonOwnerAuthUsers} & 1 & Account.number & - & authorizes.cid \\
+\cline{2-5}
+& 2 & authorizes.pid & - & Person.id \\
+\cline{2-5}
+& 3 & Account.owner & - & signs.oid \\
+\cline{2-5}
+& 4 & signs.pid & - & Person.id \\
+\hline
+indirectUser & 5 & indirectUser.id & - & Account.owner \\
+\hline
+SELECT & 6 & indirectUser.number & - & Account.number \\
+\hline
+\end{tabular}
+\end{table}
+
+\par
+The optimization effect in Query 5 is same as Query 4. The runtime before optimization is 8 minutes and 21 seconds while 10.5 seconds is the runtime after optimization.
 
 \section{CCDB System Interface}
 The interface to our CCDB system is realized with the front end JSP webpage and the back end servlet. A webpage provides an interface where users are able to invoke one of the five queries described in section \ref{sec:qando}. The servlet is responsible for interacting with the database and returning the query results to the browser.
