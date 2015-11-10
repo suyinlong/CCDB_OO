@@ -965,11 +965,15 @@ out.println( "</table>" );
 \end{verbatim}
 
 \subsection{Results}
-A user first opens a browser and types the URL (\url{http://localhost:8080/ccdb_oo/index.jsp}) to connect to the server. Then, a webpage allowing the user to select a SQL query shows up. Once a query is invoked, a table consisting of query results will be displayed. Figure \ref{fig:resultccdb} shows a sample result in which the user invokes the first query.
+\par
+In this assignment we include an Eclipse project named \textit{ccdb} for our CCDB system. Before executing our CCDB, one needs to install Eclipse and set up the Apache Tomcat server. Instructions for setting up the Tomcat server are available here: \href{http://www.tutorialspoint.com/jsp/jsp_environment_setup.htm}{JSP - Environment Setup} and \href{http://www.eclipse.org/webtools/community/education/web/t320/Configuring_an_Application_Server_in_Eclipse.pdf}{Configuring an Application Server in Eclipse}.
+
+\par
+To run our CCDB system, one first starts the Tomcat server, and then opens a browser (Firefox or Internet Explorer), typing the URL (\url{http://localhost:8080/ccdb_oo/index.jsp}) to connect to the server. Then, a webpage allowing the user to select a SQL query shows up. Once a query is invoked, a table consisting of query results will be displayed. Figure \ref{fig:resultccdb} shows a sample result in which the user invokes the first query.
 
 \begin{figure}[!htp]
 \centering
-\includegraphics[scale=0.8]{result.pdf}
+\makebox[\textwidth]{\includegraphics[width=\paperwidth]{result.pdf}}
 \caption{Result of the first query}
 \label{fig:resultccdb}
 \end{figure}
@@ -993,7 +997,7 @@ Table \ref{tab:workdivision} shows the division of this project.
 \cline{3-4}
 & & UDT, tables, triggers, functions & Yinlong Su \\
 \cline{3-4}
-& & Indexes & Wei-Ying Tsai \\
+& & Indexes & Yinlong Su and Wei-Ying Tsai \\
 \hline
 \multicolumn{3}{|l||}{Queries} & Yinlong Su \\
 \hline
