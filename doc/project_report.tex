@@ -1,7 +1,7 @@
 % @Author: Yinlong Su
 % @Date:   2015-10-30 16:15:47
 % @Last Modified by:   Yinlong Su
-% @Last Modified time: 2015-11-09 12:21:13
+% @Last Modified time: 2015-11-09 19:42:42
 
 \documentclass[11pt]{article}
 \usepackage{pgf-umlcd}
@@ -28,13 +28,18 @@
 
 \begin{document}
 \title{CSE532 Project Report\\\large Credit Card Database\\via the Object-Oriented Extension of SQL}
-\author{Author Name, \#SBU ID}
+\author{Yinlong Su, \#110461173 \\ Wei-Ying Tsai, \#110351414}
 \maketitle
 
+\setcounter{section}{-1}
+\section{Statement}
+We pledge our honor that all parts of this project were done by us alone and without collaboration with anybody else.
+
 \section{Database Design}
-Something about design, general
+The design of database has two parts. The first part is E-R design, which is described in section \ref{sec:erd}. The second part is object-relational design in section \ref{sec:ord}.
 
 \subsection{Entity-Relationship Design}
+\label{sec:erd}
 After a series of consideration, we decided the final Entity-Relationship Model as Figure \ref{fig:erccdb}.
 \begin{figure}[!htp]
 \centering
@@ -73,7 +78,7 @@ After a series of consideration, we decided the final Entity-Relationship Model 
 \label{sec:E-R design}
 
 \par
-Since the owner of a credit card account can be either a person or an organization, we create a supertype Client. Every entity of type Organization and Person are subtypes of Client. This partition on Client satifies the disjointness constraint and covering constraint.
+Since the owner of a credit card account can be either a person or an organization, we create a supertype Client. Every entity of type Organization and Person are subtypes of Client. This partition on Client satisfies the disjointness constraint and covering constraint.
 
 \par
 This supertype make it easy for us to define a proper foreign key constraint in Account table. The relationship ``Owns''does not need extra table to store these relationships. In fact, every account can have exactly one owner, no more and no less. We draw an arrow pointing in the direction of the relationship's diamond in thick lines. We know that account Number is a key of Account and Owns. Thus, we can merge the attributes of Owns into Account. It is guaranteed that each Account tuple has exactly one corresponding Owns tuple, so no redundancy is created. Then we can concatenate Account and Owns tuples which have same account number to table AccountMergeWithOwns. For simplicity, we just call it Account.
@@ -83,7 +88,7 @@ The relationship Signs and Authorizes are many-to-many relationships. We have to
 
 \subsubsection{Relational Database Schemas}
 \par
-Now we can convert the E-R diagram to relational database schemas. Noting that here we assume there is no inheritance and other object-oriented features. We keep Person and Organization entities. For client type hierarchy, we represent the IsA relationship in general representation. That means we create Client table stroing all information. And table Organization and Person both have a foreign key pointing to Client. The relationship Owns has been merged into Account. The SQL CREATE statements are as follows.
+Now we can convert the E-R diagram to relational database schemas. Noting that here we assume there is no inheritance and other object-oriented features. We keep Person and Organization entities. For client type hierarchy, we represent the IsA relationship in general representation. That means we create Client table storing all information. And table Organization and Person both have a foreign key pointing to Client. The relationship Owns has been merged into Account. The SQL CREATE statements are as follows.
 \begin{verbatim}
 CREATE TABLE Account (
     Number  CHAR(20),
@@ -126,43 +131,9 @@ CREATE TABLE Authorizes (
 \end{verbatim}
 
 \subsection{Object-relational Design}
-
+\label{sec:ord}
 \par
 The object-relational database concept provides us some very exciting features which will tremendously simplify the database schemas and query statements. Based on SQL 1999/2003 object extensions, we designed a draft schema of object-relational design of CCDB. The UML class diagram is shown as Figure \ref{fig:umlccdb}, and we also created the ODL-style schema.
-
-\begin{verbatim}
-class Account: Object
-    ( key: number )
-{
-    attribute string number;
-    attribute numeric balance;
-    attribute numeric limit;
-    relationship Client owner inverse Client::accounts;
-    relationship Set<Person> authorizerdUsers inverse Person::authorizedAccounts;
-}
-
-class Client: Object
-{
-    attribute string id;
-    attribute string name;
-    attribute string address;
-    relationship SET<Account> accounts inverse Account::owner;
-}
-
-class Organization: Client
-    ( key: id )
-{
-    relationship SET<Person> signers inverse Person::id;
-}
-
-class Person: Client
-    ( key: id )
-{
-    attribute date dob;
-    relationship SET<Organization> signOrgs inverse Orgnization::id;
-    relationship SET<Account> authorizedAccounts inverse Account::authorizedUsers;
-}
-\end{verbatim}
 
 \begin{figure}[!htp]
 \centering
@@ -214,14 +185,45 @@ class Person: Client
 \label{fig:umlccdb}
 \end{figure}
 
+
+\begin{verbatim}
+class Account: Object
+    ( key: number )
+{
+    attribute string number;
+    attribute numeric balance;
+    attribute numeric limit;
+    relationship Client owner inverse Client::accounts;
+    relationship Set<Person> authorizerdUsers inverse Person::authorizedAccounts;
+}
+
+class Client: Object
+{
+    attribute string id;
+    attribute string name;
+    attribute string address;
+    relationship SET<Account> accounts inverse Account::owner;
+}
+
+class Organization: Client
+    ( key: id )
+{
+    relationship SET<Person> signers inverse Person::id;
+}
+
+class Person: Client
+    ( key: id )
+{
+    attribute date dob;
+    relationship SET<Organization> signOrgs inverse Orgnization::id;
+    relationship SET<Account> authorizedAccounts inverse Account::authorizedUsers;
+}
+\end{verbatim}
+
 \par
 With the power of object referencing, we can store all references into set-value types thus we do not need to create many relationship table/class. But unfortunately, PostgreSQL does not support all of the object-oriented features. In fact, it is very limited. Hence we have to adjust our design to cater to PostgreSQL.
 
-
 \subsubsection{Client Type Hierarchy}
-
-\par
-We have briefly talked about the supertype Client in section \ref{sec:E-R design}. Now we describe it in detail. The first problem we encountered is that the owner of a credit card account can be either a person or an organization. Although the sample test data has different ids between Person and Organization, we can not assume all data satifsies this condition. If we add a new enum column, which labeling the owner type, into Account, then we can distingish it by $(ownerId, ownerType)$. But then we have another problem: we can not define a proper foreign key constraint under ownerId column.
 
 \begin{wrapfigure}{R}{0.5\textwidth}
 \begin{tikzpicture}
@@ -249,9 +251,12 @@ We have briefly talked about the supertype Client in section \ref{sec:E-R design
 \end{wrapfigure}
 
 \par
+We have briefly talked about the supertype Client in section \ref{sec:E-R design}. Now we describe it in detail. The first problem we encountered is that the owner of a credit card account can be either a person or an organization. Although the sample test data has different ids between Person and Organization, we can not assume all data satisfies this condition. If we add a new enum column, which labeling the owner type, into Account, then we can distinguish it by $(ownerId, ownerType)$. But then we have another problem: we can not define a proper foreign key constraint under ownerId column.
+
+\par
 Therefore, we decided to create a supertype Client. All the attributes of Client type are applicable to subtype entities. We defined this IsA relationship that relates Client, Organization and Person. The role Sub refers to Organization and Person, while the role Super refers to Client. In the view of object-oriented, Client is a super class while Organization and Person are subclasses, as shown in Figure \ref{fig:clienthierarchy}. The subclasses inherit the features of the super class.
 \par
-In addition, our partition on Client is disjoint. A client can not be a person and an organization at the same time. Thus we will not have duplicate tuples in subtables when inserting data into non-disjoint subtypes in PostgreSQL (we will discuss it later in section \label{ref:ptype}). And the partition also satisfies the covering constraint since the union of the sets of instances Organization and Person equals the set of instances of Client.
+In addition, our partition on Client is disjoint. A client cannot be a person and an organization at the same time. Thus we will not have duplicate tuples in subtables when inserting data into non-disjoint subtypes in PostgreSQL (we will discuss it later in section \label{ref:ptype}). And the partition also satisfies the covering constraint since the union of the sets of instances Organization and Person equals the set of instances of Client.
 \par
 We noticed that Person type and Organization type have many common attributes like id, name, address and they can both be the owner of a credit card account. Using the inheritance of object-oriented view, we can define those attributes once and reuse it in subclasses.
 \par
@@ -285,7 +290,7 @@ We noticed that Person type and Organization type have many common attributes li
 \end{wrapfigure}
 
 \par
-In our CCDB, a person can partcipate in many relationship. For example, a person can sign for an organization, can be authorized to use a card, and can also own some credit cards. Naturally, we can divide Person to Signer, AuthorizedUser and so on although the partition is not disjoint. At the begining we accept the Person Type Hierarchy and it seemed to have no big problem. But soon when we used PostgreSQL to insert data into tables, the trouble rose up.
+In our CCDB, a person can participate in many relationship. For example, a person can sign for an organization, can be authorized to use a card, and can also own some credit cards. Naturally, we can divide Person to Signer, AuthorizedUser and so on although the partition is not disjoint. At the beginning we accept the Person Type Hierarchy and it seemed to have no big problem. But soon when we used PostgreSQL to insert data into tables, the trouble rose up.
 
 \par
 We used the concept of inheritance from object-oriented databases in PostgreSQL. Two tables, Signer and AuthorizedUser, inherit from Person. If we insert data into supertable Person, the subtables will have no data. That's understandable since the subtable has more attributes and constraints so that it can not extract data directly from supertable. But one person can be both a signer and an authorized user. If we insert data into subtables, we will have duplicate tuples in the view of supertable. For example `p4 - May' is a signer of organization `Acme', and also an authorized user of credit card c10. We insert the data of May into Signer and AuthorizedUser then we have two ``identical'' tuples in supertable Person.
@@ -318,7 +323,7 @@ The partition is not disjoint thus brings redundancy. We do not split the Person
 \subsubsection{References in PostgreSQL}
 \label{sec:refinpgsql}
 \par
-In SQL 1999/2003 object extensions, we can use object references to access related objects in a way similar to object-oriented language, like Java. In PostgreSQL, we can define a column type as an existing table. For example, we can define ``owner'' column as Person type in table PerAccount. But it is actually store a Person tuple in the column, not a real reference. PostgreSQL does not provide reference types. Instead, PostgreSQL has a kind of object identifier types. For safety issues, PostgreSQL only uses OIDs as primary keys for various system tables. User-created tables are not recommended to use OIDs.
+In SQL 1999/2003 object extensions, we can use object references to access related objects in a way similar to object-oriented language, like Java. In PostgreSQL, we can define a column type as an existing table. For example, we can define ``owner'' column as Client type in table Account. But it is actually store a Client tuple in the column, not a real reference. PostgreSQL does not provide reference types. Instead, PostgreSQL has a kind of object identifier types. For safety issues, PostgreSQL only uses OIDs as primary keys for various system tables. User-created tables are not recommended to use OIDs.
 \par
 Using OIDs in our tables does not simplify the query in our system. No function or call is provided to convert OID to object. If we want to get the object the OID represents, we have to do join query. Basically, it has nothing different from using our own foreign keys.
 \par
@@ -328,13 +333,13 @@ When we create a foreign key that points to a supertable, we will encounter exce
 \par
 As a result, we need to handle the foreign key constraints which point to a supertable very carefully. We can create some triggers to ensure the data consistency. Or we can insert duplicate tuples to both supertable and subtable. In our design, we have a foreign key pointing to supertable Client from table Account. We keep a same copy of every tuple of subtables Organization and Person in supertable Client.
 \par
-In addition, PostgreSQL does not support array element foreign key referencing. In our original object-relational design, we have some array attributes in our classes. PostgreSQL can not define foreign key references on array. At first we want to use CHECK constraint, but those CHECK constraints in PostgreSQL does not support nested query.
+In addition, PostgreSQL does not support array element foreign key referencing. In our original object-relational design, we have some array attributes in our classes. PostgreSQL cannot define foreign key references on array. At first we want to use CHECK constraint, but those CHECK constraints in PostgreSQL does not support nested query.
 \par
-So we have to use triggers to ensure the references if we want to use arrays in our tables. Or we can use extra relationship tables and foreign keys in an old way. It is ARRAY + TRIGGERS vs TABLE + FOREIGN KEY. We choose the latter in our final design and we have three reasons:
+We can use triggers to ensure the references if we want to use arrays in our tables. Or we can use extra relationship tables and foreign keys in an old way. It is ARRAY + TRIGGERS vs TABLE + FOREIGN KEY. We choose the latter in our final design and we have three reasons:
 \par
 \begin{enumerate}
 \item Using so many triggers is inefficient. For every many-to-many relationship, if we use arrays, we have to create triggers on every foreign key constraint. The triggers are for the action taken after update and delete. If we want to ensure participation constraints, we have to create triggers before insert. We do not want to write so many triggers. Using build-in foreign key constraints of PostgreSQL is fine with us.
-\item Space efficiencies are asymptotically equal. Stroing the reference ids in array or table takes exactly the same space. Even if we compare the space taken by managing array structure or by managing new table, those two ways have same space complexities.
+\item Space efficiencies are asymptotically equal. Storing the reference ids in array or table takes exactly the same space. Even if we compare the space taken by managing array structure or by managing new table, those two ways have same space complexities.
 \item Class methods are global in PostgreSQL. We define some methods that return required tuples in our original design before. PostgreSQL stores all functions under schema, not table. That means if we move the array references out of table into a new relationship table, all functions in PostgreSQL have same accessibility.
 \end{enumerate}
 \par
@@ -342,7 +347,7 @@ So we decide to use extra relationship tables and foreign key references to stor
 
 \subsubsection{CCDB Database on PostgreSQL}
 \par
-PostgreSQL has some object-relational database features. But many of them are different from what we think about. In this section we cretae our CCDB system on PostgreSQL. Before we go into details, we create a new UML class diagram for CCDB under PostgreSQL, as shown in Figure \ref{fig:newumlccdb}.
+PostgreSQL has some object-relational database features. But many of them are different from what we think about. In this section we create our CCDB system on PostgreSQL. Before we go into details, we create a new UML class diagram for CCDB under PostgreSQL, as shown in Figure \ref{fig:newumlccdb}.
 \par
 We remove the package Clients. Also, we omit all 0..* labels on association lines. Finally, all functions are grouped in a yellow box, which indicates the schema function library.
 
@@ -429,7 +434,7 @@ CREATE TYPE public.clienttype AS
 
 \paragraph{Table Inheritance in PostgreSQL}
 \par
-PostgreSQL provides table inheritance. Based on the types and inheritance relationship, four tables are created as Account, Client, Organization and Person. We also create two relationship tables signs and authorizes. We include all primary key constraints and foreign key constraints as many as possible here.
+PostgreSQL provides table inheritance. Based on the types and inheritance relationship, four tables are created as Account, Client, Organization and Person. We also create two relationship tables: signs and authorizes. We include all primary key constraints and foreign key constraints as many as possible here.
 
 \begin{verbatim}
 CREATE TABLE public."Account"
@@ -502,7 +507,7 @@ CREATE TABLE public.authorizes
 
 \paragraph{Triggers}
 \par
-We talked about we need triggers to ensure the constraints pointing to a supertable in section \ref{sec:refinpgsql}. Basically, we need to make supertable always has the tuples of its subtables. So we create triggers on Organization and Person. When the modify is done, do the same thing with supertable Client.
+We talked about we need triggers to ensure the constraints pointing to a supertable in section \ref{sec:refinpgsql}. Basically, we need to make supertable always has the tuples of its subtables. So we create triggers on Organization and Person. When the modifies are done, do the same things with supertable Client.
 
 \begin{verbatim}
 CREATE OR REPLACE FUNCTION public.tf_i_client()
@@ -572,7 +577,7 @@ CREATE TRIGGER tf_d_organization
   EXECUTE PROCEDURE public.tf_d_client();
 \end{verbatim}
 
-\paragraph{Functions} PostgreSQL allows function overloading. We create several basic functions to satifsy our need. For the required query, we also create some helper functions. We will talk about that in section \ref{sec:qando}.
+\paragraph{Functions} PostgreSQL allows function overloading. We create several basic functions to satisfy our need. For the required query, we also create some helper functions. We will talk about that in section \ref{sec:qando}.
 \label{sec:functions}
 \begin{verbatim}
 CREATE OR REPLACE FUNCTION public."getAuthUsers"("Account")
@@ -634,7 +639,7 @@ CREATE INDEX authorizes_pid ON "authorizes" USING btree (pid);
 \label{sec:qando}
 The queries are the same as Project 1. PostgreSQL has not support universal quantification, so we convert query 3 into double-negation form. As for query 4 and 5, we created recursive queries using common table expressions.
 \par
-To test the effect of optimization, we inserted 100,000 random tuples into Account, Organization and Person tables resepectively. Table authorizes and signs are also inserted 10,000 random tuples separately.
+To test the effect of optimization, we inserted 100,000 random tuples into Account, Organization and Person tables respectively. Table authorizes and signs are also inserted 10,000 random tuples separately.
 
 \subsection{Query 1}
 Find all pairs of the form (user,signer), where user is an authorized user of an organization's credit card, signer is a person at that organization with signature authority, and the balance on the card is within \$1,000 of the credit limit. For each user/signer, show Id and Name.
@@ -959,14 +964,46 @@ while (rs.next())
 out.println( "</table>" );
 \end{verbatim}
 
-\section{Results}
+\subsection{Results}
 A user first opens a browser and types the URL (\url{http://localhost:8080/ccdb_oo/index.jsp}) to connect to the server. Then, a webpage allowing the user to select a SQL query shows up. Once a query is invoked, a table consisting of query results will be displayed. Figure \ref{fig:resultccdb} shows a sample result in which the user invokes the first query.
 
 \begin{figure}[!htp]
 \centering
-\includegraphics[width=7in]{result.pdf}
+\includegraphics[scale=0.8]{result.pdf}
 \caption{Result of the first query}
 \label{fig:resultccdb}
 \end{figure}
+
+\section{Work division}
+Table \ref{tab:workdivision} shows the division of this project.
+
+\begin{table}[!htbp]
+\centering
+\label{tab:workdivision}
+\caption{Work division}
+\begin{tabular}{|l|c|c||c|}
+\hline
+\multicolumn{3}{|c||}{Item} & Person \\
+\hline
+\multirow{5}{*}{Design} & \multicolumn{2}{c||}{Entity-relationship model} & Yinlong Su \\
+\cline{2-4}
+& \multirow{4}{*}{Object-relational model} & ODL & Wei-Ying Tsai \\
+\cline{3-4}
+& & UML & Yinlong Su \\
+\cline{3-4}
+& & UDT, tables, triggers, functions & Yinlong Su \\
+\cline{3-4}
+& & Indexes & Wei-Ying Tsai \\
+\hline
+\multicolumn{3}{|l||}{Queries} & Yinlong Su \\
+\hline
+\multirow{3}{*}{Interface} & \multicolumn{2}{c||}{JDBC} & Yinlong Su \\
+\cline{2-4}
+& \multicolumn{2}{c||}{Servlet} & Wei-Ying Tsai \\
+\cline{2-4}
+& \multicolumn{2}{c||}{JSP} & Wei-Ying Tsai \\
+\hline
+\end{tabular}
+\end{table}
 
 \end{document}

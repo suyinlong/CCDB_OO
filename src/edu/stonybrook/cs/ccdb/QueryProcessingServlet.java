@@ -1,3 +1,11 @@
+/****************************************************************************
+	CSE532 -- Project 2
+	File name: QueryProcessingServlet.java
+	Authors: 	Wei-Ying Tsai (110351414)
+				Yinlong Su (110461173)
+	Brief description: Query processing servlet
+****************************************************************************/
+
 package edu.stonybrook.cs.ccdb;
 
 import java.io.IOException;

@@ -86,4 +86,5 @@ h1, h2, h3, h4, h5 { color: #333; font-family: Georgia, 'Times New Roman', Times
     width: 700px;
     height: 1000px;
     overflow-y: visible;
+    margin-top: 10px;
 }

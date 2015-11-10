@@ -1,3 +1,11 @@
+/****************************************************************************
+	CSE532 -- Project 2
+	File name: Congifuration.java
+	Authors: 	Yinlong Su (110461173)
+				Wei-Ying Tsai (110351414)
+	Brief description: Configuration class for project
+****************************************************************************/
+
 package edu.stonybrook.cs.ccdb;
 
 public class Configuration {

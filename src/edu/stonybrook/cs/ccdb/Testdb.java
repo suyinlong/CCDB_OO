@@ -1,3 +1,11 @@
+/****************************************************************************
+	CSE532 -- Project 2
+	File name: Testdb.java
+	Authors: 	Yinlong Su (110461173)
+				Wei-Ying Tsai (110351414)
+	Brief description: for testing JDBC
+****************************************************************************/
+
 package edu.stonybrook.cs.ccdb;
 
 import java.sql.*;
